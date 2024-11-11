@@ -11,10 +11,16 @@
 
 #define VISUALIZE 1
 #define CUDA_NAIVE 1
+#define CUDA_KDTREE	0
 
 int numPoints = 0;
 int numDataPoints = 0;
 int numModelPoints = 0;
+
+#if CUDA_KDTREE
+Tree tree;
+KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */));
+#endif
 
 std::vector<glm::vec3> dataBuffer;
 std::vector<glm::vec3> modelBuffer;
@@ -171,6 +177,17 @@ bool init(int argc, char **argv) {
 	numPoints = dataBuffer.size() + modelBuffer.size();
 	std::cout << "Total " << numPoints << " points loaded" << std::endl;
 
+#if CUDA_KDTREE
+	// Load points into tree.points
+	// Example: tree.points.push_back(glm::vec3(x, y, z));
+	tree.points = modelBuffer;
+	// Create and build the KDTree
+	kdtree.buildIndex();
+
+	std::cout << "KD-tree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
+#endif
+
+
 	cudaDeviceProp deviceProp;
 	int gpuDevice = 0;
 	int device_count = 0;
@@ -312,7 +329,9 @@ void runCUDA() {
 	cudaGLMapBufferObject((void**)&dptrVertcolors, pointVBO_colors);
 
 	// execute the kernel
-#if CUDA_NAIVE
+#if CUDA_KDTREE
+	ICP::kdTreeGPUStep(kdtree, tree);
+#elif CUDA_NAIVE
 	ICP::naiveGPUStep();
 #else
 	ICP::CPUStep(dataBuffer, modelBuffer);
