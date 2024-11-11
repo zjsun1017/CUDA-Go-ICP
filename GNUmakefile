@@ -22,9 +22,6 @@ RelWithDebugInfo: build
 	(cd build && ${CMAKE} -DCMAKE_BUILD_TYPE=$@ .. && make)
 
 
-run:
-	build/cis565_path_tracer scenes/sphere.txt
-
 build:
 	mkdir -p build
 

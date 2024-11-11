@@ -50,20 +50,15 @@ set(GLM_ROOT_DIR "${CMAKE_SOURCE_DIR}/external")
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
 
-set(headers
-    src/cudaMat4.hpp
-    src/glslUtility.hpp
-    src/kernel.h
-    src/main.hpp
-    src/utilityCore.hpp
-    )
+file(GLOB headers
+    src/*.h
+    src/*.hpp
+)
 
-set(sources
-    src/glslUtility.cpp
-    src/kernel.cu
-    src/main.cpp
-    src/utilityCore.cpp
-    )
+file(GLOB sources
+    src/*.cpp
+    src/*.cu
+)
 
 list(SORT headers)
 list(SORT sources)
@@ -81,6 +76,8 @@ else()
     set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES native)
 endif()
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "$<$<AND:$<CONFIG:Debug,RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-G>")
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
+
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${CMAKE_PROJECT_NAME})
 
 add_custom_command(

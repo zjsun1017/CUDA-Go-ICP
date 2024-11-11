@@ -1,42 +1,148 @@
 /**
 * @file      main.cpp
-* @brief     Example Boids flocking simulation for CIS 5650
-* @authors   Liam Boone, Kai Ninomiya, Kangning (Gary) Li
-* @date      2013-2017
-* @copyright University of Pennsylvania
+* @brief     GPU Accelerated Go-ICP
+* @authors   Zhaojin Sun, Mufeng Xu
+* @copyright 2024 Zhaojin & Mufeng. All rights reserved.
+* @note      This code framework is based on CIS5650 Project 1
 */
 
 #include "main.hpp"
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
-#include "kernel.h"
+#include "tinyply.h"
 
-// ================
-// Configuration
-// ================
-
-// LOOK-2.1 LOOK-2.3 - toggles for UNIFORM_GRID and COHERENT_GRID
 #define VISUALIZE 1
-#define UNIFORM_GRID 1
-#define COHERENT_GRID 1
+#define CUDA_NAIVE 1
 
-// LOOK-1.2 - change this to adjust particle count in the simulation
-const int N_FOR_VIS = 50000;
-const float DT = 0.2f;
+int numPoints = 0;
+int numDataPoints = 0;
+int numModelPoints = 0;
 
-// TODO-3 Performance analysis
-// Credits to Mufeng
-#define FPS_CUDA 1
-#define FPS_WINDOW_CUDA 1000
-/**
-* C main function.
+std::vector<glm::vec3> dataBuffer;
+std::vector<glm::vec3> modelBuffer;
+
+glm::vec3* dev_pos;
+glm::vec3* dev_col;
+
+glm::vec3* dev_dataBuffer;
+glm::vec3* dev_modelBuffer;
+glm::vec3* dev_corrBuffer;
+
+glm::vec3* dev_centeredCorrBuffer;
+glm::vec3* dev_centeredDataBuffer;
+glm::mat3* dev_ABtBuffer;
+
+// Helper function to determine the file extension
+std::string getFileExtension(const std::string& filename) {
+	size_t pos = filename.find_last_of(".");
+	if (pos != std::string::npos) {
+		std::string ext = filename.substr(pos + 1);
+		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+		return ext;
+	}
+	return "";
+}
+
+// Function to load a TXT point cloud file
+bool loadTXTPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
+	std::ifstream ifile(FName);
+	if (!ifile.is_open()) {
+		std::cerr << "Unable to open point file '" << FName << "'" << std::endl;
+		return false;
+	}
+
+	ifile >> N;
+	if (N <= 0) {
+		std::cerr << "Invalid number of points in the file: " << FName << std::endl;
+		return false;
+	}
+
+	buffer.resize(N);
+	for (int i = 0; i < N; i++) {
+		float x, y, z;
+		ifile >> x >> y >> z;
+		buffer[i] = glm::vec3(x, y, z);
+	}
+
+	ifile.close();
+	std::cout << "Loaded " << N << " points from TXT file '" << FName << "'" << std::endl;
+	return true;
+}
+
+// Function to load a PLY point cloud file
+bool loadPLYPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
+	try {
+		std::ifstream file_stream(FName, std::ios::binary);
+		if (!file_stream.is_open()) {
+			std::cerr << "Unable to open point file '" << FName << "'" << std::endl;
+			return false;
+		}
+
+		tinyply::PlyFile ply_file;
+		ply_file.parse_header(file_stream);
+
+		std::shared_ptr<tinyply::PlyData> vertices;
+		try {
+			vertices = ply_file.request_properties_from_element("vertex", { "x", "y", "z" });
+		}
+		catch (const std::exception& e) {
+			std::cerr << "PLY file is missing 'x', 'y', or 'z' vertex properties: " << e.what() << std::endl;
+			return false;
+		}
+
+		ply_file.read(file_stream);
+
+		if (vertices && vertices->count > 0) {
+			N = static_cast<int>(vertices->count);
+			buffer.resize(N);
+
+			const float* vertex_buffer = reinterpret_cast<const float*>(vertices->buffer.get());
+			for (int i = 0; i < N; ++i) {
+				buffer[i] = glm::vec3(
+					vertex_buffer[3 * i + 0],
+					vertex_buffer[3 * i + 1],
+					vertex_buffer[3 * i + 2]
+				);
+			}
+
+			file_stream.close();
+			std::cout << "Loaded " << N << " points from PLY file '" << FName << "'" << std::endl;
+			return true;
+		}
+		else {
+			std::cerr << "No vertices found in the PLY file: " << FName << std::endl;
+			return false;
+		}
+	}
+	catch (const std::exception& e) {
+		std::cerr << "Error reading PLY file '" << FName << "': " << e.what() << std::endl;
+		return false;
+	}
+}
+
+// Main function to load point cloud from a file with automatic type detection
+bool loadPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
+	std::string extension = getFileExtension(FName);
+
+	if (extension == "txt") {
+		return loadTXTPointCloud(FName, N, buffer);
+	}
+	else if (extension == "ply") {
+		return loadPLYPointCloud(FName, N, buffer);
+	}
+	else {
+		std::cerr << "Unsupported file format: " << extension << std::endl;
+		return false;
+	}
+}
+
+/*
+*C main function.
 */
 int main(int argc, char* argv[]) {
-	projectName = "5650 CUDA Intro: Boids";
+	projectName = "Fast Globally Optimal ICP";
 
 	if (init(argc, argv)) {
 		mainLoop();
-		Boids::endSimulation();
+		PointCloud::cleanupBuffers();
 		return 0;
 	}
 	else {
@@ -44,22 +150,33 @@ int main(int argc, char* argv[]) {
 	}
 }
 
-//-------------------------------
-//---------RUNTIME STUFF---------
-//-------------------------------
-
 std::string deviceName;
-GLFWwindow* window;
+GLFWwindow *window;
 
 /**
 * Initialization of CUDA and GLFW.
 */
-bool init(int argc, char** argv) {
-	// Set window title to "Student Name: [SM 2.0] GPU Name"
+bool init(int argc, char **argv) {
+	std::cout << "Loading data points..." << std::endl;
+	if (!loadPointCloud(argv[1], numDataPoints, dataBuffer)) {
+		return false;
+	}
+
+	std::cout << "Loading model(target) points..." << std::endl;
+	if (!loadPointCloud(argv[2], numModelPoints, modelBuffer)) {
+		return false;
+	}
+
+	// Initialize drawing state
+	numPoints = dataBuffer.size() + modelBuffer.size();
+	std::cout << "Total " << numPoints << " points loaded" << std::endl;
+
 	cudaDeviceProp deviceProp;
 	int gpuDevice = 0;
 	int device_count = 0;
+
 	cudaGetDeviceCount(&device_count);
+
 	if (gpuDevice > device_count) {
 		std::cout
 			<< "Error: GPU device number is greater than the number of devices!"
@@ -106,37 +223,32 @@ bool init(int argc, char** argv) {
 		return false;
 	}
 
-	// Initialize drawing state
 	initVAO();
 
 	// Default to device ID 0. If you have more than one GPU and want to test a non-default one,
 	// change the device ID.
 	cudaGLSetGLDevice(0);
 
-	cudaGLRegisterBufferObject(boidVBO_positions);
-	cudaGLRegisterBufferObject(boidVBO_velocities);
+	cudaGLRegisterBufferObject(pointVBO_positions);
+	cudaGLRegisterBufferObject(pointVBO_colors);
 
-	// Initialize N-body simulation
-	Boids::initSimulation(N_FOR_VIS);
+	PointCloud::initBuffers(dataBuffer, modelBuffer);
 
 	updateCamera();
-
 	initShaders(program);
-
 	glEnable(GL_DEPTH_TEST);
-
 	return true;
 }
 
 void initVAO() {
 
-	std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (N_FOR_VIS)] };
-	std::unique_ptr<GLuint[]> bindices{ new GLuint[N_FOR_VIS] };
+	std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (numPoints)] };
+	std::unique_ptr<GLuint[]> bindices{ new GLuint[numPoints] };
 
 	glm::vec4 ul(-1.0, -1.0, 1.0, 1.0);
 	glm::vec4 lr(1.0, 1.0, 0.0, 0.0);
 
-	for (int i = 0; i < N_FOR_VIS; i++) {
+	for (int i = 0; i < numPoints; i++) {
 		bodies[4 * i + 0] = 0.0f;
 		bodies[4 * i + 1] = 0.0f;
 		bodies[4 * i + 2] = 0.0f;
@@ -145,79 +257,73 @@ void initVAO() {
 	}
 
 
-	glGenVertexArrays(1, &boidVAO); // Attach everything needed to draw a particle to this
-	glGenBuffers(1, &boidVBO_positions);
-	glGenBuffers(1, &boidVBO_velocities);
-	glGenBuffers(1, &boidIBO);
+	glGenVertexArrays(1, &pointVAO); // Attach everything needed to draw a particle to this
+	glGenBuffers(1, &pointVBO_positions);
+	glGenBuffers(1, &pointVBO_colors);
+	glGenBuffers(1, &pointIBO);
 
-	glBindVertexArray(boidVAO);
+	glBindVertexArray(pointVAO);
 
-	// Bind the positions array to the boidVAO by way of the boidVBO_positions
-	glBindBuffer(GL_ARRAY_BUFFER, boidVBO_positions); // bind the buffer
-	glBufferData(GL_ARRAY_BUFFER, 4 * (N_FOR_VIS) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW); // transfer data
-
+	// Bind the positions array to the pointVAO by way of the pointVBO_positions
+	glBindBuffer(GL_ARRAY_BUFFER, pointVBO_positions); // bind the buffer
+	glBufferData(GL_ARRAY_BUFFER, 4 * (numPoints) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW); // transfer data
 	glEnableVertexAttribArray(positionLocation);
 	glVertexAttribPointer((GLuint)positionLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-	// Bind the velocities array to the boidVAO by way of the boidVBO_velocities
-	glBindBuffer(GL_ARRAY_BUFFER, boidVBO_velocities);
-	glBufferData(GL_ARRAY_BUFFER, 4 * (N_FOR_VIS) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
-	glEnableVertexAttribArray(velocitiesLocation);
-	glVertexAttribPointer((GLuint)velocitiesLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
+	// Bind the colors array to the pointVAO by way of the pointVBO_colors
+	glBindBuffer(GL_ARRAY_BUFFER, pointVBO_colors);
+	glBufferData(GL_ARRAY_BUFFER, 4 * (numPoints) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(colorsLocation);
+	glVertexAttribPointer((GLuint)colorsLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boidIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (N_FOR_VIS) * sizeof(GLuint), bindices.get(), GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, pointIBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (numPoints) * sizeof(GLuint), bindices.get(), GL_STATIC_DRAW);
 
 	glBindVertexArray(0);
 }
 
-void initShaders(GLuint* program) {
+void initShaders(GLuint * program) {
 	GLint location;
 
-	program[PROG_BOID] = glslUtility::createProgram(
-		"shaders/boid.vert.glsl",
-		"shaders/boid.geom.glsl",
-		"shaders/boid.frag.glsl", attributeLocations, 2);
-	glUseProgram(program[PROG_BOID]);
+	program[PROG_POINT] = glslUtility::createProgram(
+		"shaders/point.vert.glsl",
+		"shaders/point.geom.glsl",
+		"shaders/point.frag.glsl", attributeLocations, 2);
+	glUseProgram(program[PROG_POINT]);
 
-	if ((location = glGetUniformLocation(program[PROG_BOID], "u_projMatrix")) != -1) {
+	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
 		glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 	}
-	if ((location = glGetUniformLocation(program[PROG_BOID], "u_cameraPos")) != -1) {
+	if ((location = glGetUniformLocation(program[PROG_POINT], "u_cameraPos")) != -1) {
 		glUniform3fv(location, 1, &cameraPosition[0]);
 	}
 }
 
-//====================================
-// Main loop
-//====================================
 void runCUDA() {
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
 	// use this buffer
 
-	float4* dptr = NULL;
-	float* dptrVertPositions = NULL;
-	float* dptrVertVelocities = NULL;
+	float4 *dptr = NULL;
+	float *dptrVertPositions = NULL;
+	float *dptrVertcolors = NULL;
 
-	cudaGLMapBufferObject((void**)&dptrVertPositions, boidVBO_positions);
-	cudaGLMapBufferObject((void**)&dptrVertVelocities, boidVBO_velocities);
+	cudaGLMapBufferObject((void**)&dptrVertPositions, pointVBO_positions);
+	cudaGLMapBufferObject((void**)&dptrVertcolors, pointVBO_colors);
 
 	// execute the kernel
-#if UNIFORM_GRID && COHERENT_GRID
-	Boids::stepSimulationCoherentGrid(DT);
-#elif UNIFORM_GRID
-	Boids::stepSimulationScatteredGrid(DT);
+#if CUDA_NAIVE
+	ICP::naiveGPUStep();
 #else
-	Boids::stepSimulationNaive(DT);
+	ICP::CPUStep(dataBuffer, modelBuffer);
 #endif
 
 #if VISUALIZE
-	Boids::copyBoidsToVBO(dptrVertPositions, dptrVertVelocities);
+	PointCloud::copyPointsToVBO(dptrVertPositions, dptrVertcolors);
 #endif
 	// unmap buffer object
-	cudaGLUnmapBufferObject(boidVBO_positions);
-	cudaGLUnmapBufferObject(boidVBO_velocities);
+	cudaGLUnmapBufferObject(pointVBO_positions);
+	cudaGLUnmapBufferObject(pointVBO_colors);
 }
 
 void mainLoop() {
@@ -225,16 +331,8 @@ void mainLoop() {
 	double timebase = 0;
 	int frame = 0;
 
-	// CUDA FPS test
-	int frameCUDA = 0;
-	double fpsCUDA = 0;
-
-	//Boids::unitTest(); // LOOK-1.2 We run some basic example code to make sure
-	//                   // your CUDA development setup is ready to go.
-
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
-#if !FPS_CUDA
 
 		frame++;
 		double time = glfwGetTime();
@@ -244,22 +342,11 @@ void mainLoop() {
 			timebase = time;
 			frame = 0;
 		}
-#endif 
-
-#if FPS_CUDA
-		cudaEvent_t begin, end;
-		cudaEventCreate(&begin);
-		cudaEventCreate(&end);
-		cudaEventRecord(begin);
-#endif
 
 		runCUDA();
 
 		std::ostringstream ss;
 		ss << "[";
-#if FPS_CUDA
-		ss << "Using CUDA: ";
-#endif
 		ss.precision(1);
 		ss << std::fixed << fps;
 		ss << " fps] " << deviceName;
@@ -268,10 +355,10 @@ void mainLoop() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 #if VISUALIZE
-		glUseProgram(program[PROG_BOID]);
-		glBindVertexArray(boidVAO);
+		glUseProgram(program[PROG_POINT]);
+		glBindVertexArray(pointVAO);
 		glPointSize((GLfloat)pointSize);
-		glDrawElements(GL_POINTS, N_FOR_VIS + 1, GL_UNSIGNED_INT, 0);
+		glDrawElements(GL_POINTS, numPoints + 1, GL_UNSIGNED_INT, 0);
 		glPointSize(1.0f);
 
 		glUseProgram(0);
@@ -279,28 +366,13 @@ void mainLoop() {
 
 		glfwSwapBuffers(window);
 #endif
-
-#if FPS_CUDA
-		cudaEventRecord(end);
-		cudaEventSynchronize(end);
-		float ms = 0;
-		cudaEventElapsedTime(&ms, begin, end);
-		frameCUDA++;
-		fpsCUDA += 1000.f / ms;
-		if (!(frameCUDA % FPS_WINDOW_CUDA)) {
-			fpsCUDA /= FPS_WINDOW_CUDA;
-			fps = fpsCUDA;
-			fpsCUDA = 0;
-			frameCUDA = 0;
-		}
-#endif
 	}
 	glfwDestroyWindow(window);
 	glfwTerminate();
 }
 
 
-void errorCallback(int error, const char* description) {
+void errorCallback(int error, const char *description) {
 	fprintf(stderr, "error %d: %s\n", error, description);
 }
 
@@ -325,7 +397,7 @@ void mousePositionCallback(GLFWwindow* window, double xpos, double ypos) {
 	}
 	else if (rightMousePressed) {
 		zoom += (ypos - lastY) / height;
-		zoom = std::fmax(0.1f, std::fmin(zoom, 5.0f));
+		zoom = std::fmax(0.1f, std::fmin(zoom, 10000.0f));
 		updateCamera();
 	}
 
@@ -345,8 +417,8 @@ void updateCamera() {
 
 	GLint location;
 
-	glUseProgram(program[PROG_BOID]);
-	if ((location = glGetUniformLocation(program[PROG_BOID], "u_projMatrix")) != -1) {
+	glUseProgram(program[PROG_POINT]);
+	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
 		glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 	}
 }
