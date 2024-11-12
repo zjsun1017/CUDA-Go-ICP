@@ -179,3 +179,56 @@ void ICP::naiveGPUStep() {
 	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
 	cudaDeviceSynchronize();
 }
+
+// KD-tree ICP step using the KDTree
+void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
+	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+
+	// Use kdTree to find nearest points for each data point
+	for (int i = 0; i < numDataPoints; ++i) {
+		glm::vec3 queryPoint = dev_dataBuffer[i];
+		float query[3] = { queryPoint.x, queryPoint.y, queryPoint.z };
+
+		size_t nearestIndex;
+		float outDistSqr;
+		nanoflann::KNNResultSet<float> resultSet(1);
+		resultSet.init(&nearestIndex, &outDistSqr);
+
+		kdTree.findNeighbors(resultSet, query, nanoflann::SearchParams(10));
+		dev_corrBuffer[i] = tree.points[nearestIndex];
+	}
+
+	// Centralize
+	glm::vec3 meanData = thrust::reduce(dev_dataBuffer, dev_dataBuffer + numDataPoints);
+	glm::vec3 meanCorr = thrust::reduce(dev_corrBuffer, dev_corrBuffer + numDataPoints);
+	meanData = meanData / static_cast<float>(numDataPoints);
+	meanCorr = meanCorr / static_cast<float>(numDataPoints);
+
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_centeredDataBuffer, meanData);
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_corrBuffer, dev_centeredCorrBuffer, meanCorr);
+	cudaDeviceSynchronize();
+
+	// Calculating rotation and translations
+	// PnP algorithm: minimizing A-RB equals to minimizing R-AB^T
+	// Kabsch algorthm: Orthogonalize the rotation matrix with SVD: AB^T = USV^T, R = UV^T
+	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
+	cudaDeviceSynchronize();
+
+	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+
+	//compute SVD of ABt
+	glm::mat3 R(0.0f), U(0.0f), S(0.0f), V(0.0f);
+	glm::vec3 T(0.0f);
+
+	matSVD(ABt, U, S, V);
+
+	R = glm::transpose(U) * V; // Strange glm::mat column sequence >:(
+	T = meanCorr - (R * meanData);
+
+	// Update and draw
+	kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, R, T);
+	cudaDeviceSynchronize();
+
+	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+	cudaDeviceSynchronize();
+}

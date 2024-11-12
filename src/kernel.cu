@@ -114,3 +114,26 @@ void PointCloud::cleanupBuffers() {
 
 	checkCUDAErrorWithLine("cudaFree failed!");
 }
+
+// Function to build the KDTree and run an example query
+void buildKDTree(Tree& tree) {
+	// Ensure this function only runs on the host side
+	std::unique_ptr<KDTree> kdtree = std::make_unique<KDTree>(
+		3 /* Data dimensionality */, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */)
+	);
+	kdtree->buildIndex();
+
+	std::cout << "KDTree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
+
+	// Example: nearest neighbor search
+	float query_pt[3] = { 1.0, 1.0, 1.0 }; // Example query point
+	size_t num_results = 1;
+	std::vector<size_t> ret_index(num_results);
+	std::vector<float> out_dist_sqr(num_results);
+
+	nanoflann::KNNResultSet<float> resultSet(num_results);
+	resultSet.init(&ret_index[0], &out_dist_sqr[0]);
+	kdtree->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
+
+	std::cout << "Nearest neighbor index: " << ret_index[0] << ", squared distance: " << out_dist_sqr[0] << std::endl;
+}
