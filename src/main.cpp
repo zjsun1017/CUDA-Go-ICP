@@ -8,10 +8,14 @@
 
 #include "main.hpp"
 #include "tinyply.h"
+#include "goicp/jly_goicp.h"
+#include <thread>
+#include <mutex>
 
 #define VISUALIZE 1
-#define CUDA_NAIVE 1
+#define CUDA_NAIVE 0
 #define CUDA_KDTREE	0
+#define CPU_GOICP 1
 
 int numPoints = 0;
 int numDataPoints = 0;
@@ -20,6 +24,13 @@ int numModelPoints = 0;
 #if CUDA_KDTREE
 Tree tree;
 KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */));
+#endif
+
+#if CPU_GOICP
+GoICP goicp;
+Matrix prev_optR = Matrix::eye(3);
+Matrix prev_optT = Matrix(3, 1);
+std::mutex mtx;
 #endif
 
 std::vector<glm::vec3> dataBuffer;
@@ -187,6 +198,20 @@ bool init(int argc, char **argv) {
 	std::cout << "KD-tree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
 #endif
 
+#if CPU_GOICP
+	goicp.pModel = modelBuffer.data();
+	goicp.pData = dataBuffer.data();
+	goicp.Nm = static_cast<int>(modelBuffer.size());
+	goicp.Nd = static_cast<int>(dataBuffer.size());
+	// Downsample
+	goicp.Nd = 2000;
+
+	// Build Distance Transform
+	cout << "Building Distance Transform..." << flush;
+	goicp.BuildDT();
+	cout << " Done.\n";
+#endif
+
 
 	cudaDeviceProp deviceProp;
 	int gpuDevice = 0;
@@ -333,6 +358,8 @@ void runCUDA() {
 	ICP::kdTreeGPUStep(kdtree, tree);
 #elif CUDA_NAIVE
 	ICP::naiveGPUStep();
+#elif CPU_GOICP
+	ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
 #else
 	ICP::CPUStep(dataBuffer, modelBuffer);
 #endif
@@ -349,6 +376,10 @@ void mainLoop() {
 	double fps = 0;
 	double timebase = 0;
 	int frame = 0;
+
+#if CPU_GOICP
+	std::thread register_thread(&GoICP::Register, &goicp);
+#endif
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();

@@ -136,6 +136,14 @@ __global__ void kernTransform(int numDataPoints, glm::vec3* pos, glm::mat3 R, gl
 	pos[index] = R * pos[index] + T;
 }
 
+__global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::vec3* out_pos, glm::mat3 R, glm::vec3 T) {
+
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= numDataPoints) return;
+
+	out_pos[index] = R * in_pos[index] + T;
+}
+
 
 // GPU ICP Pipeline
 void ICP::naiveGPUStep() {
@@ -232,3 +240,37 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
 	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
 	cudaDeviceSynchronize();
 }
+
+void ICP::goicpCPUStep(const GoICP &goicp, Matrix &prev_optR, Matrix &prev_optT, std::mutex &mtx) {
+	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+
+	bool updated = false;
+	// main thread, simply check for update
+	{
+		// Lock mutex before accessing optR and optT
+		std::lock_guard<std::mutex> lock(mtx);
+
+		if (!goicp.finished && (prev_optR != goicp.optR || prev_optT != goicp.optT)) {
+			prev_optR = goicp.optR;
+			prev_optT = goicp.optT;
+			updated = true;
+		}
+	} // Unlock mutex (out of scope)
+
+	if (updated) {
+		glm::mat3 R { prev_optR.val[0][0], prev_optR.val[0][1] ,prev_optR.val[0][2] ,
+					 prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
+					 prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
+		R = glm::transpose(R);
+
+		glm::vec3 T { prev_optT.val[0][0], prev_optT.val[1][0], prev_optT.val[2][0] };
+
+		// Update and draw
+		kernTransform <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, dev_dataBuffer, dev_corrBuffer, R, T);
+		cudaDeviceSynchronize();
+
+		std::copy(&dev_corrBuffer[0], &dev_corrBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+		cudaDeviceSynchronize();
+	}
+}
+
