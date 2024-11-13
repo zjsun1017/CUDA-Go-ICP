@@ -12,10 +12,6 @@
 #include <thread>
 #include <mutex>
 
-#define VISUALIZE 1
-#define CUDA_NAIVE 0
-#define CUDA_KDTREE	0
-#define CPU_GOICP 1
 
 int numPoints = 0;
 int numDataPoints = 0;
@@ -41,11 +37,16 @@ glm::vec3* dev_col;
 
 glm::vec3* dev_dataBuffer;
 glm::vec3* dev_modelBuffer;
+#if CPU_GOICP
+glm::vec3* dev_optDataBuffer;
+glm::vec3* dev_curDataBuffer;
+#else
 glm::vec3* dev_corrBuffer;
 
 glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
+#endif
 
 // Helper function to determine the file extension
 std::string getFileExtension(const std::string& filename) {
@@ -185,7 +186,11 @@ bool init(int argc, char **argv) {
 	}
 
 	// Initialize drawing state
+#if CPU_GOICP
+	numPoints = 2 * dataBuffer.size() + modelBuffer.size();
+#else
 	numPoints = dataBuffer.size() + modelBuffer.size();
+#endif
 	std::cout << "Total " << numPoints << " points loaded" << std::endl;
 
 #if CUDA_KDTREE
@@ -204,7 +209,7 @@ bool init(int argc, char **argv) {
 	goicp.Nm = static_cast<int>(modelBuffer.size());
 	goicp.Nd = static_cast<int>(dataBuffer.size());
 	// Downsample
-	goicp.Nd = 2000;
+	goicp.Nd = 5000;
 
 	// Build Distance Transform
 	cout << "Building Distance Transform..." << flush;

@@ -1,15 +1,9 @@
 #ifndef COMMOM_H
 #define COMMOM_H
 
-#define dimension 3
-#define Xd 0
-#define Yd 1
-#define Zd 2
-
-typedef struct {
-	int dataIdx;
-	bool good;
-	int depth;
-} mystack;
+#define VISUALIZE 1
+#define CUDA_NAIVE 0
+#define CUDA_KDTREE	0
+#define CPU_GOICP 1
 
 #endif

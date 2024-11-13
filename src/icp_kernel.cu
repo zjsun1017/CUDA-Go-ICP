@@ -9,13 +9,18 @@ extern int numModelPoints;
 extern glm::vec3* dev_pos;
 extern glm::vec3* dev_col;
 
-extern glm::vec3* dev_dataBuffer;
+extern glm::vec3 * dev_dataBuffer;
 extern glm::vec3* dev_modelBuffer;
+#if CPU_GOICP
+extern glm::vec3* dev_optDataBuffer;
+extern glm::vec3* dev_curDataBuffer;
+#else
 extern glm::vec3* dev_corrBuffer;
 
 extern glm::vec3* dev_centeredCorrBuffer;
 extern glm::vec3* dev_centeredDataBuffer;
 extern glm::mat3* dev_ABtBuffer;
+#endif
 
 //Helper functions
 void matSVD(glm::mat3& ABt, glm::mat3& U, glm::mat3& S, glm::mat3& V)
@@ -144,7 +149,7 @@ __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::v
 	out_pos[index] = R * in_pos[index] + T;
 }
 
-
+#if CUDA_NAIVE
 // GPU ICP Pipeline
 void ICP::naiveGPUStep() {
 
@@ -240,37 +245,55 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
 	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
 	cudaDeviceSynchronize();
 }
+#endif
 
 void ICP::goicpCPUStep(const GoICP &goicp, Matrix &prev_optR, Matrix &prev_optT, std::mutex &mtx) {
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
-	bool updated = false;
+	Matrix curR;
+	Matrix curT;
 	// main thread, simply check for update
 	{
 		// Lock mutex before accessing optR and optT
 		std::lock_guard<std::mutex> lock(mtx);
 
-		if (!goicp.finished && (prev_optR != goicp.optR || prev_optT != goicp.optT)) {
-			prev_optR = goicp.optR;
-			prev_optT = goicp.optT;
-			updated = true;
-		}
+		prev_optR = goicp.optR;
+		prev_optT = goicp.optT;
+
+		curR = goicp.curR;
+		curT = goicp.curT;
+
 	} // Unlock mutex (out of scope)
 
-	if (updated) {
+	if (!goicp.finished || prev_optR != goicp.optR || prev_optT != goicp.optT) {
+		// Draw Optimal data cloud
 		glm::mat3 R { prev_optR.val[0][0], prev_optR.val[0][1] ,prev_optR.val[0][2] ,
-					 prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
-					 prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
+					  prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
+					  prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
 		R = glm::transpose(R);
 
 		glm::vec3 T { prev_optT.val[0][0], prev_optT.val[1][0], prev_optT.val[2][0] };
 
-		// Update and draw
-		kernTransform <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, dev_dataBuffer, dev_corrBuffer, R, T);
+		kernTransform <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, dev_dataBuffer, dev_optDataBuffer, R, T);
 		cudaDeviceSynchronize();
 
-		std::copy(&dev_corrBuffer[0], &dev_corrBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+		std::copy(&dev_optDataBuffer[0], &dev_optDataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+
+		// Draw Current computing data cloud
+		glm::mat3 Rc { curR.val[0][0], curR.val[0][1] ,curR.val[0][2] ,
+					   curR.val[1][0] ,curR.val[1][1] ,curR.val[1][2] ,
+					   curR.val[2][0] ,curR.val[2][1] ,curR.val[2][2] };
+		Rc = glm::transpose(Rc);
+
+		glm::vec3 Tc { curT.val[0][0], curT.val[1][0], curT.val[2][0] };
+
+		kernTransform <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, dev_dataBuffer, dev_curDataBuffer, Rc, Tc);
 		cudaDeviceSynchronize();
+
+		std::copy(&dev_curDataBuffer[0], &dev_curDataBuffer[0] + numDataPoints, &dev_pos[numModelPoints + numDataPoints]);
+	} else {
+		// clear 
+		numPoints = numDataPoints + numModelPoints;
 	}
 }
 

@@ -14,6 +14,7 @@
 #include <thrust/transform_reduce.h>
 
 #include "nanoflann.hpp"
+#include "common.h"
 
 #define blockSize 512
 #define scene_scale 0.050f

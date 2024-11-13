@@ -10,11 +10,16 @@ extern glm::vec3* dev_col;
 
 extern glm::vec3* dev_dataBuffer;
 extern glm::vec3* dev_modelBuffer;
+#if CPU_GOICP
+extern glm::vec3* dev_optDataBuffer;
+extern glm::vec3* dev_curDataBuffer;
+#else
 extern glm::vec3* dev_corrBuffer;
 
 extern glm::vec3* dev_centeredCorrBuffer;
 extern glm::vec3* dev_centeredDataBuffer;
 extern glm::mat3* dev_ABtBuffer;
+#endif
 
 // Helper Functions
 void checkCUDAError(const char* msg, int line) {
@@ -69,6 +74,12 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	checkCUDAErrorWithLine("cudaMallocManaged dev_dataBuffer failed!");
 	cudaMallocManaged((void**)&dev_modelBuffer, numModelPoints * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
+#if CPU_GOICP
+	cudaMallocManaged((void**)&dev_optDataBuffer, numDataPoints * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_optDataBuffer failed!");
+	cudaMallocManaged((void**)&dev_curDataBuffer, numDataPoints * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_curDataBuffer failed!");	
+#else
 	cudaMallocManaged((void**)&dev_corrBuffer, numDataPoints * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_corrBuffer failed!");
 	cudaMallocManaged((void**)&dev_centeredDataBuffer, numDataPoints * sizeof(glm::vec3));
@@ -77,18 +88,21 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	checkCUDAErrorWithLine("cudaMallocManaged dev_centeredCorrBuffer failed!");
 	cudaMallocManaged((void**)&dev_ABtBuffer, numDataPoints * sizeof(glm::mat3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_ABtBuffer failed!");
+#endif
 
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_modelBuffer);
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_pos);
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints);
+	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints + numDataPoints);
 
 	// Set color buffer
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 	dim3 modelBlocksPerGrid((numModelPoints + blockSize - 1) / blockSize);
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
+	kernResetVec3Buffer <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, &dev_col[numModelPoints + numDataPoints], glm::vec3(0.6, 0.6, 0.6));
 
 	cudaDeviceSynchronize();
 }
@@ -107,10 +121,15 @@ void PointCloud::cleanupBuffers() {
 	cudaFree(dev_col);
 	cudaFree(dev_modelBuffer);
 	cudaFree(dev_dataBuffer);
+#if CPU_GOICP
+	cudaFree(dev_optDataBuffer);
+	cudaFree(dev_curDataBuffer);
+#else
 	cudaFree(dev_corrBuffer);
 	cudaFree(dev_centeredDataBuffer);
 	cudaFree(dev_centeredCorrBuffer);
 	cudaFree(dev_ABtBuffer);
+#endif
 
 	checkCUDAErrorWithLine("cudaFree failed!");
 }

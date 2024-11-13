@@ -15,6 +15,7 @@
 #include "glslUtility.hpp"
 #include "icp_kernel.h"
 #include "kernel.h"
+#include "common.h"
 
 #include <math.h>
 #include <cuda.h>
