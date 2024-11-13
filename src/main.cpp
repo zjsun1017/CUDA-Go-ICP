@@ -31,6 +31,9 @@ std::mutex mtx;
 
 std::vector<glm::vec3> dataBuffer;
 std::vector<glm::vec3> modelBuffer;
+#if SUBSAMPLE
+std::vector<glm::vec3> dataSampleBuffer;
+#endif
 
 glm::vec3* dev_pos;
 glm::vec3* dev_col;
@@ -203,19 +206,6 @@ bool init(int argc, char **argv) {
 	std::cout << "KD-tree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
 #endif
 
-#if CPU_GOICP
-	goicp.pModel = modelBuffer.data();
-	goicp.pData = dataBuffer.data();
-	goicp.Nm = static_cast<int>(modelBuffer.size());
-	goicp.Nd = static_cast<int>(dataBuffer.size());
-	// Downsample
-	goicp.Nd = 5000;
-
-	// Build Distance Transform
-	cout << "Building Distance Transform..." << flush;
-	goicp.BuildDT();
-	cout << " Done.\n";
-#endif
 
 
 	cudaDeviceProp deviceProp;
@@ -280,6 +270,26 @@ bool init(int argc, char **argv) {
 	cudaGLRegisterBufferObject(pointVBO_colors);
 
 	PointCloud::initBuffers(dataBuffer, modelBuffer);
+#if SUBSAMPLE
+	ICP::randomSampleData(dataBuffer, dataSampleBuffer, numDataPoints, subsampleRate);
+#endif
+
+#if CPU_GOICP
+	goicp.pModel = modelBuffer.data();
+	goicp.Nm = static_cast<int>(modelBuffer.size());
+	#if SUBSAMPLE
+		goicp.pData = dataSampleBuffer.data();
+		goicp.Nd = static_cast<int>(dataSampleBuffer.size());
+	#else
+		goicp.pData = dataBuffer.data();
+		goicp.Nd = static_cast<int>(dataBuffer.size());
+	#endif
+
+	// Build Distance Transform
+	cout << "Building Distance Transform..." << flush;
+	goicp.BuildDT();
+	cout << " Done.\n";
+#endif
 
 	updateCamera();
 	initShaders(program);
@@ -366,7 +376,7 @@ void runCUDA() {
 #elif CPU_GOICP
 	ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
 #else
-	ICP::CPUStep(dataBuffer, modelBuffer);
+	ICP::CPUStep(dataSampleBuffer, modelBuffer);
 #endif
 
 #if VISUALIZE

@@ -242,7 +242,7 @@ bool Matrix::operator!=(const Matrix& M) {
   }
   for (int32_t i = 0; i < m; i++)
     for (int32_t j = 0; j < n; j++)
-      if (abs(A.val[i][j] - B.val[i][j]) > 1e-6f)
+      if (abs(A.val[i][j] - B.val[i][j]) > 1e-15f)
         return true;
 
   return false;

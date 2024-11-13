@@ -1,6 +1,12 @@
 #define GLM_FORCE_CUDA
 #include "icp_kernel.h"
 #include "svd3.h"
+#include <thrust/random.h>
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/copy.h>
+#include <thrust/remove.h>
+#include <thrust/execution_policy.h>
 
 extern int numPoints;
 extern int numDataPoints;
@@ -149,6 +155,56 @@ __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::v
 	out_pos[index] = R * in_pos[index] + T;
 }
 
+__global__ void kernRandomSample(int numDataPoints, bool* mask, float ratio) {
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= numDataPoints) return;
+
+	thrust::default_random_engine rng(index);
+	thrust::uniform_real_distribution<float> u01(0.0f, 1.0f);
+	mask[index] = u01(rng) < ratio;
+}
+
+void ICP::randomSampleData(const std::vector<glm::vec3>& dataBuffer, std::vector<glm::vec3>& dataSampleBuffer, size_t numData, float ratio)
+{
+	dim3 dataBlocksPerGrid((numData + blockSize - 1) / blockSize);
+
+	// Allocate memory for the mask on the device
+	bool* d_mask;
+	cudaMallocManaged((void**)&d_mask, numData * sizeof(bool));
+	checkCUDAErrorWithLine("cudaMallocManaged d_mask failed!");
+	cudaDeviceSynchronize();
+
+	// Launch kernel to fill mask with true/false based on random sampling ratio
+	kernRandomSample <<<dataBlocksPerGrid, blockSize >>> (numData, d_mask, ratio);
+	cudaDeviceSynchronize();
+
+	// Transfer dataBuffer to device
+	thrust::device_vector<glm::vec3> d_dataBuffer(dataBuffer.begin(), dataBuffer.end());
+
+	// Allocate device vector for mask and copy data to device
+	thrust::device_vector<bool> d_maskVec(d_mask, d_mask + numData);
+
+	// Use Thrust to filter dataBuffer based on mask
+	auto newEnd = thrust::remove_if(
+		thrust::device,
+		d_dataBuffer.begin(),
+		d_dataBuffer.end(),
+		d_maskVec.begin(),
+		thrust::logical_not<bool>()
+	);
+
+	// Resize d_dataBuffer to contain only the sampled points
+	d_dataBuffer.resize(newEnd - d_dataBuffer.begin());
+
+	// Copy sampled points back to the host
+	dataSampleBuffer.resize(d_dataBuffer.size());
+	thrust::copy(d_dataBuffer.begin(), d_dataBuffer.end(), dataSampleBuffer.begin());
+	cudaDeviceSynchronize();
+
+	// Free allocated memory
+	cudaFree(d_mask);
+}
+
 #if CUDA_NAIVE
 // GPU ICP Pipeline
 void ICP::naiveGPUStep() {
@@ -247,15 +303,22 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
 }
 #endif
 
+#if CPU_GOICP
 void ICP::goicpCPUStep(const GoICP &goicp, Matrix &prev_optR, Matrix &prev_optT, std::mutex &mtx) {
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
 	Matrix curR;
 	Matrix curT;
-	// main thread, simply check for update
+
+	bool finished;
+	bool updated;
+	// Main thread, simply check for update
 	{
 		// Lock mutex before accessing optR and optT
 		std::lock_guard<std::mutex> lock(mtx);
+
+		finished = goicp.finished;
+		updated = (prev_optR != goicp.optR || prev_optT != goicp.optT);
 
 		prev_optR = goicp.optR;
 		prev_optT = goicp.optT;
@@ -265,20 +328,22 @@ void ICP::goicpCPUStep(const GoICP &goicp, Matrix &prev_optR, Matrix &prev_optT,
 
 	} // Unlock mutex (out of scope)
 
-	if (!goicp.finished || prev_optR != goicp.optR || prev_optT != goicp.optT) {
+	if (updated) {
 		// Draw Optimal data cloud
-		glm::mat3 R { prev_optR.val[0][0], prev_optR.val[0][1] ,prev_optR.val[0][2] ,
-					  prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
-					  prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
+		glm::mat3 R{ prev_optR.val[0][0], prev_optR.val[0][1] ,prev_optR.val[0][2] ,
+						prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
+						prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
 		R = glm::transpose(R);
 
-		glm::vec3 T { prev_optT.val[0][0], prev_optT.val[1][0], prev_optT.val[2][0] };
+		glm::vec3 T{ prev_optT.val[0][0], prev_optT.val[1][0], prev_optT.val[2][0] };
 
-		kernTransform <<< dataBlocksPerGrid, blockSize >>> (numDataPoints, dev_dataBuffer, dev_optDataBuffer, R, T);
+		kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_optDataBuffer, R, T);
 		cudaDeviceSynchronize();
 
 		std::copy(&dev_optDataBuffer[0], &dev_optDataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+	}
 
+	if (!finished) {
 		// Draw Current computing data cloud
 		glm::mat3 Rc { curR.val[0][0], curR.val[0][1] ,curR.val[0][2] ,
 					   curR.val[1][0] ,curR.val[1][1] ,curR.val[1][2] ,
@@ -296,4 +361,4 @@ void ICP::goicpCPUStep(const GoICP &goicp, Matrix &prev_optR, Matrix &prev_optT,
 		numPoints = numDataPoints + numModelPoints;
 	}
 }
-
+#endif

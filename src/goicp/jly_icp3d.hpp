@@ -112,8 +112,8 @@ template <typename T>
 ICP3D<T>::ICP3D()
 {
 	max_iter_def = 10000;
-	err_diff_def = 0.000001;
-	trim_fraction = 0;
+	err_diff_def = 0.0000001;
+	trim_fraction = 0.1;
 	do_trim = true;
 
 	kdtree = NULL;
