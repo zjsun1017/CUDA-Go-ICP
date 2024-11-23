@@ -1,6 +1,8 @@
 #define GLM_FORCE_CUDA
 #include "icp_kernel.h"
 #include "svd3.h"
+#include <device_atomic_functions.h>
+#include <cuda_runtime.h>
 
 extern int numPoints;
 extern int numDataPoints;
@@ -16,6 +18,10 @@ extern glm::vec3* dev_corrBuffer;
 extern glm::vec3* dev_centeredCorrBuffer;
 extern glm::vec3* dev_centeredDataBuffer;
 extern glm::mat3* dev_ABtBuffer;
+
+extern FlattenedKDTree* dev_fkdt;
+extern float* dev_minDists;
+extern size_t* dev_minIndices;
 
 //Helper functions
 void matSVD(glm::mat3& ABt, glm::mat3& U, glm::mat3& S, glm::mat3& V)
@@ -136,6 +142,34 @@ __global__ void kernTransform(int numDataPoints, glm::vec3* pos, glm::mat3 R, gl
 	pos[index] = R * pos[index] + T;
 }
 
+__global__ void kernKDSearchNearest(int numDataPoints, glm::vec3* dataBuffer,
+	glm::vec3* modelBuffer, glm::vec3* corrBuffer,
+	FlattenedKDTree* fkdt, float* minDists, size_t* minIndices)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= numDataPoints) { return; }
+
+	glm::vec3 query = dataBuffer[index];
+	fkdt->find_nearest_neighbor(query, minDists[index], minIndices[index]);
+
+	corrBuffer[index] = modelBuffer[minIndices[index]];
+}
+
+__global__ void kernTestKDTreeLookUp(int N, glm::vec3 query, FlattenedKDTree* fkdt, float* min_dists, size_t* min_indices)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N) { return; }
+
+	fkdt->find_nearest_neighbor(query, *min_dists, *min_indices);
+}
+
+__global__ void kernResetFloatBuffer(int N, float* intBuffer, float value) {
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index < N) {
+		intBuffer[index] = value;
+	}
+}
+
 
 // GPU ICP Pipeline
 void ICP::naiveGPUStep() {
@@ -181,22 +215,32 @@ void ICP::naiveGPUStep() {
 }
 
 // KD-tree ICP step using the KDTree
-void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
+void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree* fkdt) {
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
-	// Use kdTree to find nearest points for each data point
-	for (int i = 0; i < numDataPoints; ++i) {
-		glm::vec3 queryPoint = dev_dataBuffer[i];
-		float query[3] = { queryPoint.x, queryPoint.y, queryPoint.z };
+	///*Use kdTree to find nearest points for each data point*/
+	//for (int i = 0; i < numDataPoints; ++i) {
+	//	glm::vec3 queryPoint = dev_dataBuffer[i];
+	//	float query[3] = { queryPoint.x, queryPoint.y, queryPoint.z };
 
-		size_t nearestIndex;
-		float outDistSqr;
-		nanoflann::KNNResultSet<float> resultSet(1);
-		resultSet.init(&nearestIndex, &outDistSqr);
+	//	size_t nearestIndex;
+	//	float outDistSqr;
+	//	nanoflann::KNNResultSet<float> resultSet(1);
+	//	resultSet.init(&nearestIndex, &outDistSqr);
 
-		kdTree.findNeighbors(resultSet, query, nanoflann::SearchParams(10));
-		dev_corrBuffer[i] = tree.points[nearestIndex];
-	}
+	//	kdTree.findNeighbors(resultSet, query, nanoflann::SearchParameters(10, true));
+	//	dev_corrBuffer[i] = tree.points[nearestIndex];
+	//}
+
+	kernResetFloatBuffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_minDists, FLT_MAX);
+	cudaDeviceSynchronize();
+
+	kernKDSearchNearest << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer,
+		dev_modelBuffer, dev_corrBuffer, dev_fkdt, dev_minDists, dev_minIndices);
+	cudaDeviceSynchronize();
+
+	/*kernTestKDTreeLookUp << < dataBlocksPerGrid, blockSize >> > (numDataPoints, glm::vec3(1.0f), dev_fkdt, dev_minDists, dev_minIndices);*/
+	//cudaDeviceSynchronize();
 
 	// Centralize
 	glm::vec3 meanData = thrust::reduce(dev_dataBuffer, dev_dataBuffer + numDataPoints);
@@ -226,9 +270,150 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, Tree& tree) {
 	T = meanCorr - (R * meanData);
 
 	// Update and draw
-	kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, R, T);
+	kernTransform <<< dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, R, T);
 	cudaDeviceSynchronize();
 
 	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
 	cudaDeviceSynchronize();
+}
+
+__global__ void kernFindNearestNeighbor(int N, glm::mat3 R, glm::vec3 t, const glm::vec3* dev_pcs, const FlattenedKDTree* d_fkdt, Correspondence* dev_corrs)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N) { return; }
+
+	glm::vec3 query_point = R * dev_pcs[index] + t;
+
+	size_t nearest_index = 0;
+
+	float distance_squared = 1e+10f;
+	d_fkdt->find_nearest_neighbor(query_point, distance_squared, nearest_index);
+
+	dev_corrs[index].dist_squared = distance_squared;
+	dev_corrs[index].idx_s = index;
+	dev_corrs[index].idx_t = nearest_index;
+	dev_corrs[index].ps_transformed = query_point;
+}
+
+__global__ void kernSetRegistrationMatrices(int N, Rotation q, glm::vec3 t, const glm::vec3* dev_pcs, const glm::vec3* dev_pct, const Correspondence* dev_corrs, float* dev_mat_pcs, float* dev_mat_pct)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N) { return; }
+
+	Correspondence corr = dev_corrs[index];
+	glm::vec3 pt = dev_pct[corr.idx_t];
+	glm::vec3 ps = corr.ps_transformed;
+
+	size_t mat_idx = index * 3;
+
+	dev_mat_pct[mat_idx] = pt.x;
+	dev_mat_pct[mat_idx + 1] = pt.y;
+	dev_mat_pct[mat_idx + 2] = pt.z;
+
+	dev_mat_pcs[mat_idx] = ps.x;
+	dev_mat_pcs[mat_idx + 1] = ps.y;
+	dev_mat_pcs[mat_idx + 2] = ps.z;
+}
+
+
+//============================================
+//            Flattened k-d tree
+//============================================
+
+FlattenedKDTree::FlattenedKDTree(const KDTree& kdt, const std::vector<glm::vec3>& pct) {
+	// Transfer point cloud and KDTree accumulator to device
+	d_pct = pct; // Copy point cloud to device
+	d_vAcc = kdt.vAcc_;
+
+	// Flatten the KDTree and transfer to device
+	size_t currentIndex = 0;
+	std::vector<ArrayNode> tempArray; // Temporary host vector for tree flattening
+	flatten_KDTree(kdt.root_node_, tempArray, currentIndex);
+
+	// Copy flattened KDTree to device
+	d_array = tempArray;
+}
+
+void FlattenedKDTree::flatten_KDTree(const KDTree::Node* root, std::vector<ArrayNode>& array, size_t& currentIndex) {
+	if (root == nullptr) return;
+
+	size_t index = currentIndex++;
+	if (index >= array.size()) {
+		array.resize(index + 1);
+	}
+
+	if (root->child1 == nullptr && root->child2 == nullptr) {
+		// Leaf node
+		array[index].is_leaf = true;
+		array[index].data.leaf.left = root->node_type.lr.left;
+		array[index].data.leaf.right = root->node_type.lr.right;
+	}
+	else {
+		// Non-leaf node
+		array[index].is_leaf = false;
+		array[index].data.nonleaf.divfeat = root->node_type.sub.divfeat;
+		array[index].data.nonleaf.divlow = root->node_type.sub.divlow;
+		array[index].data.nonleaf.divhigh = root->node_type.sub.divhigh;
+
+		// Recursively flatten left and right child nodes
+		size_t child1Index = currentIndex;
+		flatten_KDTree(root->child1, array, currentIndex);
+		array[index].data.nonleaf.child1 = child1Index;
+
+		size_t child2Index = currentIndex;
+		flatten_KDTree(root->child2, array, currentIndex);
+		array[index].data.nonleaf.child2 = child2Index;
+	}
+}
+
+__device__ float distance_squared(const glm::vec3 p1, const glm::vec3 p2)
+{
+	float dx = p1.x - p2.x;
+	float dy = p1.y - p2.y;
+	float dz = p1.z - p2.z;
+	return dx * dx + dy * dy + dz * dz;
+}
+
+__device__ void FlattenedKDTree::find_nearest_neighbor(const glm::vec3 query, float& best_dist, size_t& best_idx) const {
+	size_t stack[64]; // Stack for non-recursive traversal
+	int stack_ptr = 0;
+
+	stack[stack_ptr++] = 0; // Root node index
+
+	while (stack_ptr > 0) {
+		size_t index = stack[--stack_ptr];
+
+		if (index >= d_array.size()) continue;
+		const ArrayNode& node = d_array[index];
+
+		if (node.is_leaf) {
+			// Process all points in the leaf node
+			size_t left = node.data.leaf.left;
+			size_t right = node.data.leaf.right;
+
+			if (left >= d_pct.size() || right >= d_pct.size()) continue;
+
+			for (size_t i = left; i <= right; i++) {
+				float dist = distance_squared(query, d_pct[d_vAcc[i]]);
+				if (dist < best_dist) {
+					/*printf("%f\n", best_dist);*/
+					best_dist = dist;
+					best_idx = d_vAcc[i];
+				}
+			}
+		}
+		else {
+			// Process non-leaf node: determine near and far child
+			int axis = node.data.nonleaf.divfeat;
+			float diff = query[axis] - node.data.nonleaf.divlow;
+
+			size_t nearChild = diff < 0 ? node.data.nonleaf.child1 : node.data.nonleaf.child2;
+			size_t farChild = diff < 0 ? node.data.nonleaf.child2 : node.data.nonleaf.child1;
+
+			stack[stack_ptr++] = nearChild;
+			if (diff * diff < best_dist) {
+				stack[stack_ptr++] = farChild;
+			}
+		}
+	}
 }

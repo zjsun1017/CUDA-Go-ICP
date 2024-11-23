@@ -11,15 +11,15 @@
 
 #define VISUALIZE 1
 #define CUDA_NAIVE 1
-#define CUDA_KDTREE	0
+#define CUDA_KDTREE	1
 
 int numPoints = 0;
 int numDataPoints = 0;
 int numModelPoints = 0;
 
 #if CUDA_KDTREE
-Tree tree;
-KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */));
+PointCloudAdaptor tree;
+KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10));
 #endif
 
 std::vector<glm::vec3> dataBuffer;
@@ -35,6 +35,10 @@ glm::vec3* dev_corrBuffer;
 glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
+
+FlattenedKDTree* dev_fkdt;
+float* dev_minDists;
+size_t* dev_minIndices;
 
 // Helper function to determine the file extension
 std::string getFileExtension(const std::string& filename) {
@@ -187,7 +191,6 @@ bool init(int argc, char **argv) {
 	std::cout << "KD-tree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
 #endif
 
-
 	cudaDeviceProp deviceProp;
 	int gpuDevice = 0;
 	int device_count = 0;
@@ -250,6 +253,10 @@ bool init(int argc, char **argv) {
 	cudaGLRegisterBufferObject(pointVBO_colors);
 
 	PointCloud::initBuffers(dataBuffer, modelBuffer);
+
+	FlattenedKDTree fkdt(kdtree, modelBuffer);
+	cudaMalloc((void**)&dev_fkdt, sizeof(FlattenedKDTree));
+	cudaMemcpy(dev_fkdt, &fkdt, sizeof(FlattenedKDTree), cudaMemcpyHostToDevice);
 
 	updateCamera();
 	initShaders(program);
@@ -330,7 +337,7 @@ void runCUDA() {
 
 	// execute the kernel
 #if CUDA_KDTREE
-	ICP::kdTreeGPUStep(kdtree, tree);
+	ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
 #elif CUDA_NAIVE
 	ICP::naiveGPUStep();
 #else

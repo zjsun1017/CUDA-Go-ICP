@@ -1,6 +1,7 @@
 #define GLM_FORCE_CUDA
 #include "kernel.h"
 
+
 extern int numPoints;
 extern int numDataPoints;
 extern int numModelPoints;
@@ -15,6 +16,10 @@ extern glm::vec3* dev_corrBuffer;
 extern glm::vec3* dev_centeredCorrBuffer;
 extern glm::vec3* dev_centeredDataBuffer;
 extern glm::mat3* dev_ABtBuffer;
+
+extern FlattenedKDTree* dev_fkdt;
+extern float* dev_minDists;
+extern size_t* dev_minIndices;
 
 // Helper Functions
 void checkCUDAError(const char* msg, int line) {
@@ -61,6 +66,7 @@ __global__ void kernCopyColorsToVBO(int N, glm::vec3* col, float* vbo, float s_s
 
 void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm::vec3>& modelBuffer) {
 	// Use unified memory
+	cudaDeviceSynchronize();
 	cudaMallocManaged((void**)&dev_pos, numPoints * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_pos failed!");
 	cudaMallocManaged((void**)&dev_col, numPoints * sizeof(glm::vec3));
@@ -77,6 +83,10 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	checkCUDAErrorWithLine("cudaMallocManaged dev_centeredCorrBuffer failed!");
 	cudaMallocManaged((void**)&dev_ABtBuffer, numDataPoints * sizeof(glm::mat3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_ABtBuffer failed!");
+	cudaMallocManaged((void**)&dev_minDists, numDataPoints * sizeof(float));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_dataBuffer failed!");
+	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
@@ -89,7 +99,7 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	dim3 modelBlocksPerGrid((numModelPoints + blockSize - 1) / blockSize);
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
-
+	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	cudaDeviceSynchronize();
 }
 
@@ -111,29 +121,10 @@ void PointCloud::cleanupBuffers() {
 	cudaFree(dev_centeredDataBuffer);
 	cudaFree(dev_centeredCorrBuffer);
 	cudaFree(dev_ABtBuffer);
+	cudaFree(dev_fkdt);
+	cudaFree(dev_minDists);
+	cudaFree(dev_minIndices);
 
 	checkCUDAErrorWithLine("cudaFree failed!");
 }
 
-// Function to build the KDTree and run an example query
-void buildKDTree(Tree& tree) {
-	// Ensure this function only runs on the host side
-	std::unique_ptr<KDTree> kdtree = std::make_unique<KDTree>(
-		3 /* Data dimensionality */, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */)
-	);
-	kdtree->buildIndex();
-
-	std::cout << "KDTree built with " << tree.kdtree_get_point_count() << " points." << std::endl;
-
-	// Example: nearest neighbor search
-	float query_pt[3] = { 1.0, 1.0, 1.0 }; // Example query point
-	size_t num_results = 1;
-	std::vector<size_t> ret_index(num_results);
-	std::vector<float> out_dist_sqr(num_results);
-
-	nanoflann::KNNResultSet<float> resultSet(num_results);
-	resultSet.init(&ret_index[0], &out_dist_sqr[0]);
-	kdtree->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
-
-	std::cout << "Nearest neighbor index: " << ret_index[0] << ", squared distance: " << out_dist_sqr[0] << std::endl;
-}
