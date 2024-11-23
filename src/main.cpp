@@ -10,7 +10,7 @@
 
 #define VISUALIZE 1
 #define CUDA_NAIVE 1
-#define CUDA_KDTREE	0
+#define CUDA_KDTREE	1
 
 int numPoints = 0;
 int numDataPoints = 0;

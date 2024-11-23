@@ -218,7 +218,7 @@ void ICP::naiveGPUStep() {
 void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree* fkdt) {
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
-	///*Use kdTree to find nearest points for each data point*/
+	/*Use kdTree to find nearest points for each data point*/
 	//for (int i = 0; i < numDataPoints; ++i) {
 	//	glm::vec3 queryPoint = dev_dataBuffer[i];
 	//	float query[3] = { queryPoint.x, queryPoint.y, queryPoint.z };
