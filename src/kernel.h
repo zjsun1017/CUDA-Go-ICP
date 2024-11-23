@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cuda.h>
 #include <cmath>
+#include <iomanip>
 #include <glm/glm.hpp>
 #include "utilityCore.hpp"
 
