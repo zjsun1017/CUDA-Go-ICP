@@ -64,29 +64,16 @@ public:
         } data;
     };
 
-    thrust::host_vector<ArrayNode> h_array;
-    thrust::host_vector<uint32_t> h_vAcc;
-    thrust::host_vector<glm::vec3> h_pct;
-
     thrust::device_vector<ArrayNode> d_array;  // Flattened KD-tree on device
     thrust::device_vector<uint32_t> d_vAcc;    // Indices mapping
     thrust::device_vector<glm::vec3> d_pct;      // Point cloud on device
     
     
-    FlattenedKDTree::FlattenedKDTree();
-    void initialize(const KDTree& kdt, const std::vector<glm::vec3>& pct);
-
-    /**
-     * @brief  Finds the nearest neighbor with the flattened k-d tree.
-     * @param  query      point in the source point cloud
-     * @param  best_dist  shortest distance found
-     * @param  best_idx   index of the nearest point in the target point cloud
-     */
+    FlattenedKDTree(const KDTree& kdt, const std::vector<glm::vec3>& pct);
     __device__ void find_nearest_neighbor(const glm::vec3 query, float& best_dist, size_t& best_idx) const;
 
-
 private:
-    void flatten_KDTree(const KDTree::Node* root, thrust::host_vector<ArrayNode>& array, size_t& currentIndex);
+    void FlattenedKDTree::flatten_KDTree(const KDTree::Node* root, std::vector<ArrayNode>& array, size_t& currentIndex);
     __device__ void find_nearest_neighbor(const glm::vec3 query, size_t index, float& best_dist, size_t& best_idx, int depth) const;
 };
 

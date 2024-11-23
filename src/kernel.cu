@@ -88,7 +88,6 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
-
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_modelBuffer);
@@ -100,7 +99,7 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	dim3 modelBlocksPerGrid((numModelPoints + blockSize - 1) / blockSize);
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
-
+	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	cudaDeviceSynchronize();
 }
 

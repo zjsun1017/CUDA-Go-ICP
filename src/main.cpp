@@ -19,7 +19,7 @@ int numModelPoints = 0;
 
 #if CUDA_KDTREE
 PointCloudAdaptor tree;
-KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10 /* max leaf */));
+KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10));
 #endif
 
 std::vector<glm::vec3> dataBuffer;
@@ -253,13 +253,10 @@ bool init(int argc, char **argv) {
 	cudaGLRegisterBufferObject(pointVBO_colors);
 
 	PointCloud::initBuffers(dataBuffer, modelBuffer);
-	
-	//Initialize k-d tree on GPU
-	cudaMallocManaged((void**)&dev_fkdt, sizeof(FlattenedKDTree));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_fkdt failed!");
-	new (dev_fkdt) FlattenedKDTree();
-	//dev_fkdt->initialize(kdtree, modelBuffer);
-	cudaDeviceSynchronize();
+
+	FlattenedKDTree fkdt(kdtree, modelBuffer);
+	cudaMalloc((void**)&dev_fkdt, sizeof(FlattenedKDTree));
+	cudaMemcpy(dev_fkdt, &fkdt, sizeof(FlattenedKDTree), cudaMemcpyHostToDevice);
 
 	updateCamera();
 	initShaders(program);
@@ -340,7 +337,7 @@ void runCUDA() {
 
 	// execute the kernel
 #if CUDA_KDTREE
-	ICP::kdTreeGPUStep(kdtree, tree);
+	ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
 #elif CUDA_NAIVE
 	ICP::naiveGPUStep();
 #else
