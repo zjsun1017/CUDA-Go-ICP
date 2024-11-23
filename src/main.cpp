@@ -7,7 +7,6 @@
 */
 
 #include "main.hpp"
-#include "tinyply.h"
 
 #define VISUALIZE 1
 #define CUDA_NAIVE 1
@@ -17,10 +16,12 @@ int numPoints = 0;
 int numDataPoints = 0;
 int numModelPoints = 0;
 
-#if CUDA_KDTREE
+
 PointCloudAdaptor tree;
 KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10));
-#endif
+FlattenedKDTree* dev_fkdt;
+float* dev_minDists;
+size_t* dev_minIndices;
 
 std::vector<glm::vec3> dataBuffer;
 std::vector<glm::vec3> modelBuffer;
@@ -35,114 +36,6 @@ glm::vec3* dev_corrBuffer;
 glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
-
-FlattenedKDTree* dev_fkdt;
-float* dev_minDists;
-size_t* dev_minIndices;
-
-// Helper function to determine the file extension
-std::string getFileExtension(const std::string& filename) {
-	size_t pos = filename.find_last_of(".");
-	if (pos != std::string::npos) {
-		std::string ext = filename.substr(pos + 1);
-		std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-		return ext;
-	}
-	return "";
-}
-
-// Function to load a TXT point cloud file
-bool loadTXTPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
-	std::ifstream ifile(FName);
-	if (!ifile.is_open()) {
-		std::cerr << "Unable to open point file '" << FName << "'" << std::endl;
-		return false;
-	}
-
-	ifile >> N;
-	if (N <= 0) {
-		std::cerr << "Invalid number of points in the file: " << FName << std::endl;
-		return false;
-	}
-
-	buffer.resize(N);
-	for (int i = 0; i < N; i++) {
-		float x, y, z;
-		ifile >> x >> y >> z;
-		buffer[i] = glm::vec3(x, y, z);
-	}
-
-	ifile.close();
-	std::cout << "Loaded " << N << " points from TXT file '" << FName << "'" << std::endl;
-	return true;
-}
-
-// Function to load a PLY point cloud file
-bool loadPLYPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
-	try {
-		std::ifstream file_stream(FName, std::ios::binary);
-		if (!file_stream.is_open()) {
-			std::cerr << "Unable to open point file '" << FName << "'" << std::endl;
-			return false;
-		}
-
-		tinyply::PlyFile ply_file;
-		ply_file.parse_header(file_stream);
-
-		std::shared_ptr<tinyply::PlyData> vertices;
-		try {
-			vertices = ply_file.request_properties_from_element("vertex", { "x", "y", "z" });
-		}
-		catch (const std::exception& e) {
-			std::cerr << "PLY file is missing 'x', 'y', or 'z' vertex properties: " << e.what() << std::endl;
-			return false;
-		}
-
-		ply_file.read(file_stream);
-
-		if (vertices && vertices->count > 0) {
-			N = static_cast<int>(vertices->count);
-			buffer.resize(N);
-
-			const float* vertex_buffer = reinterpret_cast<const float*>(vertices->buffer.get());
-			for (int i = 0; i < N; ++i) {
-				buffer[i] = glm::vec3(
-					vertex_buffer[3 * i + 0],
-					vertex_buffer[3 * i + 1],
-					vertex_buffer[3 * i + 2]
-				);
-			}
-
-			file_stream.close();
-			std::cout << "Loaded " << N << " points from PLY file '" << FName << "'" << std::endl;
-			return true;
-		}
-		else {
-			std::cerr << "No vertices found in the PLY file: " << FName << std::endl;
-			return false;
-		}
-	}
-	catch (const std::exception& e) {
-		std::cerr << "Error reading PLY file '" << FName << "': " << e.what() << std::endl;
-		return false;
-	}
-}
-
-// Main function to load point cloud from a file with automatic type detection
-bool loadPointCloud(const std::string& FName, int& N, std::vector<glm::vec3>& buffer) {
-	std::string extension = getFileExtension(FName);
-
-	if (extension == "txt") {
-		return loadTXTPointCloud(FName, N, buffer);
-	}
-	else if (extension == "ply") {
-		return loadPLYPointCloud(FName, N, buffer);
-	}
-	else {
-		std::cerr << "Unsupported file format: " << extension << std::endl;
-		return false;
-	}
-}
 
 /*
 *C main function.
@@ -167,17 +60,13 @@ GLFWwindow *window;
 * Initialization of CUDA and GLFW.
 */
 bool init(int argc, char **argv) {
-	std::cout << "Loading data points..." << std::endl;
-	if (!loadPointCloud(argv[1], numDataPoints, dataBuffer)) {
-		return false;
-	}
-
-	std::cout << "Loading model(target) points..." << std::endl;
-	if (!loadPointCloud(argv[2], numModelPoints, modelBuffer)) {
-		return false;
-	}
+	Config config(argv[1]);
+	load_cloud(config.io.source, config.subsample, dataBuffer);
+	load_cloud(config.io.target, config.subsample, modelBuffer);
 
 	// Initialize drawing state
+	numDataPoints = dataBuffer.size();
+	numModelPoints = modelBuffer.size();
 	numPoints = dataBuffer.size() + modelBuffer.size();
 	std::cout << "Total " << numPoints << " points loaded" << std::endl;
 

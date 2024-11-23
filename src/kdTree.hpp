@@ -74,6 +74,5 @@ public:
 
 private:
     void FlattenedKDTree::flatten_KDTree(const KDTree::Node* root, std::vector<ArrayNode>& array, size_t& currentIndex);
-    __device__ void find_nearest_neighbor(const glm::vec3 query, size_t index, float& best_dist, size_t& best_idx, int depth) const;
 };
 
