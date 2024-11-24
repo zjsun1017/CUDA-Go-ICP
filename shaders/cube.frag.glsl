@@ -1,10 +1,8 @@
-#version 330
+#version 330 core
 
-in vec4 vFragColor;
+in vec4 vertexColor;
 out vec4 fragColor;
 
 void main() {
-    fragColor.r = abs(vFragColor.r);
-    fragColor.g = abs(vFragColor.g);
-    fragColor.b = abs(vFragColor.b);
+    fragColor = vec4(vertexColor.rgb, 0.5);
 }

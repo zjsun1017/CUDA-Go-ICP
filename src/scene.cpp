@@ -1,64 +1,54 @@
 #include "scene.h"
 #include "window.h"
 
-const char* cubeAttributeLocations[] = { "Position", "Color", "Scale"};
+extern int numTransCubes;
 
-GLuint cubeVAO, cubeVBO, cubeEBO;
-void initCubeVAO() 
-{
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO);
-    glGenBuffers(1, &cubeEBO);
+GLuint cubeVAO = 0, cubeVBO_positions = 0, cubeVBO_flags = 0, cubeVBO_sizes = 0;
+void initCubeVAO() {
+    std::unique_ptr<float[]> positions{ new float[3 * numTransCubes] }; 
+    std::unique_ptr<int[]> flags{ new int[numTransCubes] };            
+    std::unique_ptr<float[]> sizes{ new float[numTransCubes] };      
+
+    for (int i = 0; i < numTransCubes; ++i) {
+        positions[3 * i + 0] = 0.0f; // x
+        positions[3 * i + 1] = 0.0f; // y
+        positions[3 * i + 2] = 0.0f; // z
+
+        flags[i] = 0;
+        sizes[i] = 1.0f;
+    }
+
+    glGenVertexArrays(1, &cubeVAO); // VAO for the cubes
+    glGenBuffers(1, &cubeVBO_positions); // VBO for positions
+    glGenBuffers(1, &cubeVBO_flags); // VBO for flags
+    glGenBuffers(1, &cubeVBO_sizes); // VBO for sizes
 
     glBindVertexArray(cubeVAO);
 
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
-
-    // Position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+    // Position buffer
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions);
+    glBufferData(GL_ARRAY_BUFFER, 3 * numTransCubes * sizeof(float), positions.get(), GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0); // Attribute 0: Position
 
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+    // Flag buffer
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_flags);
+    glBufferData(GL_ARRAY_BUFFER, numTransCubes * sizeof(int), flags.get(), GL_DYNAMIC_DRAW);
     glEnableVertexAttribArray(1);
+    glVertexAttribIPointer(1, 1, GL_INT, 0, (void*)0); // Attribute 1: Flag (integer)
 
-    glBindVertexArray(0);
+    // Size buffer
+    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_sizes);
+    glBufferData(GL_ARRAY_BUFFER, numTransCubes * sizeof(float), sizes.get(), GL_DYNAMIC_DRAW);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 0, (void*)0); // Attribute 2: Size
+
+    glBindVertexArray(0); // Unbind VAO
 }
-
-//void initCubeVAO() {
-//    glGenVertexArrays(1, &cubeVAO);
-//    glGenBuffers(1, &cubeVBO_positions);
-//    glGenBuffers(1, &cubeVBO_colors);
-//    glGenBuffers(1, &cubeVBO_sizes);
-//
-//    glBindVertexArray(cubeVAO);
-//
-//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions);
-//    glBufferData(GL_ARRAY_BUFFER, numCubes * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-//    glEnableVertexAttribArray(0);
-//    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-//
-//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_colors);
-//    glBufferData(GL_ARRAY_BUFFER, numCubes * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-//    glEnableVertexAttribArray(1);
-//    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-//
-//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_sizes);
-//    glBufferData(GL_ARRAY_BUFFER, numCubes * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
-//    glEnableVertexAttribArray(2);
-//    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), (void*)0);
-//
-//    glBindVertexArray(0);
-//}
-
-
 
 void initCubeShaders(GLuint* program) {
     GLint location;
+    const char* cubeAttributeLocations[] = { "Position", "Flag", "Size" };
 
     program[PROG_CUBE] = glslUtility::createProgram(
         "shaders/cube.vert.glsl",  

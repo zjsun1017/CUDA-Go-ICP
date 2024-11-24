@@ -46,13 +46,24 @@ glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
-int numCubes = 100;
+
+int maxCubeDivide = 3;
+int numTransCubes = 0;
+
+std::vector<glm::vec3> transCubePosBuffer;
+std::vector<int> transCubeFlagBuffer;
+std::vector<float> transCubeSizeBuffer;
+
+std::vector<glm::vec3> rotCubePosBuffer;
+std::vector<int> rotCubeFlagBuffer;
+std::vector<float> rotCubeSizeBuffer;
+
 glm::vec3* dev_transCubePosBuffer;
-glm::vec3* dev_transCubeColBuffer;
+int* dev_transCubeFlagBuffer;
 float* dev_transCubeSizeBuffer;
 
 glm::vec3* dev_rotCubePosBuffer;
-glm::vec3* dev_rotCubeColBuffer;
+int* dev_rotCubeFlagBuffer;
 float* dev_rotCubeSizeBuffer;
 
 std::string deviceName;
@@ -66,4 +77,5 @@ void mainLoop();
 void runCUDA();
 
 void initPointCloud(int argc, char** argv);
+void initSearchSpace();
 void initBufferAndkdTree();

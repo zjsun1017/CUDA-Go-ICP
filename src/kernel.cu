@@ -21,13 +21,22 @@ extern FlattenedKDTree* dev_fkdt;
 extern float* dev_minDists;
 extern size_t* dev_minIndices;
 
-extern int numCubes;
+extern int numTransCubes;
+
+extern std::vector<glm::vec3> transCubePosBuffer;
+extern std::vector<int> transCubeFlagBuffer;
+extern std::vector<float> transCubeSizeBuffer;
+
+extern std::vector<glm::vec3> rotCubePosBuffer;
+extern std::vector<int> rotCubeFlagBuffer;
+extern std::vector<float> rotCubeSizeBuffer;
+
 extern glm::vec3* dev_transCubePosBuffer;
-extern glm::vec3* dev_transCubeColBuffer;
+extern int* dev_transCubeFlagBuffer;
 extern float* dev_transCubeSizeBuffer;
 
 extern glm::vec3* dev_rotCubePosBuffer;
-extern glm::vec3* dev_rotCubeColBuffer;
+extern int* dev_rotCubeFlagBuffer;
 extern float* dev_rotCubeSizeBuffer;
 
 // Helper Functions
@@ -74,21 +83,16 @@ __global__ void kernCopyColorsToVBO(int N, glm::vec3* col, float* vbo, float s_s
 }
 
 __global__ void kernCopyCubeDataToVBO(
-	int numCubes, int alpha, glm::vec3* posBuffer, glm::vec3* colBuffer, float* sizeBuffer,
-	float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
+	int numTransCubes, glm::vec3* posBuffer, int* flagBuffer, float* sizeBuffer,
+	float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
 
 	int index = threadIdx.x + (blockIdx.x * blockDim.x);
-	if (index < numCubes) {
-		vbodptr_positions[4 * index + 0] = posBuffer[index].x;
-		vbodptr_positions[4 * index + 1] = posBuffer[index].y;
-		vbodptr_positions[4 * index + 2] = posBuffer[index].z;
-		vbodptr_positions[4 * index + 3] = 1.0f;
+	if (index < numTransCubes) {
+		vbodptr_positions[3 * index + 0] = posBuffer[index].x;
+		vbodptr_positions[3 * index + 1] = posBuffer[index].y;
+		vbodptr_positions[3 * index + 2] = posBuffer[index].z;
 
-		vbodptr_colors[4 * index + 0] = colBuffer[index].x;
-		vbodptr_colors[4 * index + 1] = colBuffer[index].y;
-		vbodptr_colors[4 * index + 2] = colBuffer[index].z;
-		vbodptr_colors[4 * index + 3] = alpha;
-
+		vbodptr_flags[index] = flagBuffer[index];
 		vbodptr_sizes[index] = sizeBuffer[index];
 	}
 }
@@ -117,17 +121,17 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
-	cudaMallocManaged((void**)&dev_transCubePosBuffer, numCubes * sizeof(glm::vec3));
+	cudaMallocManaged((void**)&dev_transCubePosBuffer, numTransCubes * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_transCubeColBuffer, numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeColBuffer failed!");
-	cudaMallocManaged((void**)&dev_transCubeSizeBuffer, numCubes * sizeof(float));
+	cudaMallocManaged((void**)&dev_transCubeFlagBuffer, numTransCubes * sizeof(int));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeFlagBuffer failed!");
+	cudaMallocManaged((void**)&dev_transCubeSizeBuffer, numTransCubes * sizeof(float));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
-	cudaMallocManaged((void**)&dev_rotCubePosBuffer, numCubes * sizeof(glm::vec3));
+	cudaMallocManaged((void**)&dev_rotCubePosBuffer, numTransCubes * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_rotCubeColBuffer, numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubeColBuffer failed!");
-	cudaMallocManaged((void**)&dev_rotCubeSizeBuffer, numCubes * sizeof(float));
+	cudaMallocManaged((void**)&dev_rotCubeFlagBuffer, numTransCubes * sizeof(int));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubeFlagBuffer failed!");
+	cudaMallocManaged((void**)&dev_rotCubeSizeBuffer, numTransCubes * sizeof(float));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubeSizeBuffer failed!");
 
 	// Set Posistion Buffer
@@ -143,32 +147,38 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	cudaDeviceSynchronize();
+
+	// Set search buffer
+	std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_transCubePosBuffer);
+	std::copy(transCubeFlagBuffer.begin(), transCubeFlagBuffer.end(), dev_transCubeFlagBuffer);
+	std::copy(transCubeSizeBuffer.begin(), transCubeSizeBuffer.end(), dev_transCubeSizeBuffer);
+	cudaDeviceSynchronize();
 }
 
 void PointCloud::copyPointsToVBO(float* vbodptr_positions, float* vbodptr_colors) {
 	dim3 fullBlocksPerGrid((numPoints + blockSize - 1) / blockSize);
-	kernCopyPositionsToVBO <<<fullBlocksPerGrid, blockSize >> > (numPoints, dev_pos, vbodptr_positions, scene_scale);
+	kernCopyPositionsToVBO << <fullBlocksPerGrid, blockSize >> > (numPoints, dev_pos, vbodptr_positions, scene_scale);
 	kernCopyColorsToVBO << <fullBlocksPerGrid, blockSize >> > (numPoints, dev_col, vbodptr_colors, scene_scale);
 	checkCUDAErrorWithLine("copyPointsToVBO failed!");
 
 	cudaDeviceSynchronize();
 }
 
-void PointCloud::copyTransCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
-	dim3 fullBlocksPerGrid((numCubes + blockSize - 1) / blockSize);
+void PointCloud::copyTransCubesToVBO( float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
+	dim3 fullBlocksPerGrid((numTransCubes + blockSize - 1) / blockSize);
 	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
-		numCubes, alpha, dev_transCubePosBuffer, dev_transCubeColBuffer, dev_transCubeSizeBuffer,
-		vbodptr_positions, vbodptr_colors, vbodptr_sizes
+		numTransCubes, dev_transCubePosBuffer, dev_transCubeFlagBuffer, dev_transCubeSizeBuffer,
+		vbodptr_positions, vbodptr_flags, vbodptr_sizes
 		);
 	checkCUDAErrorWithLine("copyCubesToVBO failed!");
 	cudaDeviceSynchronize();
 }
 
-void PointCloud::copyRotCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
-	dim3 fullBlocksPerGrid((numCubes + blockSize - 1) / blockSize);
+void PointCloud::copyRotCubesToVBO( float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
+	dim3 fullBlocksPerGrid((numTransCubes + blockSize - 1) / blockSize);
 	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
-		numCubes, alpha, dev_rotCubePosBuffer, dev_rotCubeColBuffer, dev_rotCubeSizeBuffer,
-		vbodptr_positions, vbodptr_colors, vbodptr_sizes
+		numTransCubes, dev_rotCubePosBuffer, dev_rotCubeFlagBuffer, dev_rotCubeSizeBuffer,
+		vbodptr_positions, vbodptr_flags, vbodptr_sizes
 		);
 	checkCUDAErrorWithLine("copyCubesToVBO failed!");
 	cudaDeviceSynchronize();

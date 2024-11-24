@@ -7,7 +7,6 @@
 
 GLuint positionLocation = 0;   // Match results from glslUtility::createProgram.
 GLuint colorsLocation = 1; // Also see attribtueLocations below.
-const char* pointAttributeLocations[] = { "Position", "Color" };
 
 GLuint pointVAO = 0;
 GLuint pointVBO_positions = 0;
@@ -40,9 +39,13 @@ extern int numPoints;
 extern int numDataPoints;
 extern int numModelPoints;
 
+extern int numTransCubes;
+
 extern std::string deviceName;
 extern GLFWwindow* window;
 extern GLFWwindow* secondWindow;
+
+extern GLuint cubeVAO, cubeVBO_positions, cubeVBO_flags, cubeVBO_sizes;
 
 /**
 * Initialization of main window
@@ -159,11 +162,13 @@ void initPointVAO() {
 
 void initPointShaders(GLuint* program) {
 	GLint location;
+	const char* pointAttributes[] = { "Position", "Color" };
 
 	program[PROG_POINT] = glslUtility::createProgram(
 		"shaders/point.vert.glsl",
 		"shaders/point.geom.glsl",
-		"shaders/point.frag.glsl", pointAttributeLocations, 2);
+		"shaders/point.frag.glsl", 
+		pointAttributes, 2);
 	glUseProgram(program[PROG_POINT]);
 
 	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
@@ -186,6 +191,10 @@ void drawMainWindow()
 
 	cudaGLMapBufferObject((void**)&dptrVertPositions, pointVBO_positions);
 	cudaGLMapBufferObject((void**)&dptrVertcolors, pointVBO_colors);
+
+	if (!dptrVertPositions || !dptrVertcolors) {
+		printf("Error: Null pointer passed to point kernel!\n");
+	}
 
 	PointCloud::copyPointsToVBO(dptrVertPositions, dptrVertcolors);
 	// unmap buffer object
@@ -277,17 +286,17 @@ bool initSecondWindow() {
 		std::cout << "Error: Could not initialize GLEW for second window!" << std::endl;
 		return false;
 	}
+	initCubeVAO();
+
+	cudaGLRegisterBufferObject(cubeVBO_positions);
+	cudaGLRegisterBufferObject(cubeVBO_flags);
+	cudaGLRegisterBufferObject(cubeVBO_sizes);
 
 	glEnable(GL_DEPTH_TEST);
-
-	initCubeVAO();
 	initCubeShaders(program);
 
 	return true;
 }
-
-extern const char* cubeAttributeLocations[];
-extern GLuint cubeVAO, cubeVBO, cubeEBO;
 
 void drawSecondWindow() {
 	glfwMakeContextCurrent(secondWindow);
@@ -295,43 +304,42 @@ void drawSecondWindow() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glUseProgram(program[PROG_CUBE]);
+	glBindVertexArray(cubeVAO);
 
-	glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
+	float* vbo_positions = NULL;
+	int* vbo_flags = NULL;
+	float* vbo_sizes = NULL;
+
+	cudaGLMapBufferObject((void**)&vbo_positions, cubeVBO_positions);
+	cudaGLMapBufferObject((void**)&vbo_flags, cubeVBO_flags);
+	cudaGLMapBufferObject((void**)&vbo_sizes, cubeVBO_sizes);
+
+	if (!vbo_positions || !vbo_flags || !vbo_sizes) {
+		printf("Error: Null pointer passed to cube kernel!\n");
+	}
+
+	PointCloud::copyTransCubesToVBO(vbo_positions, vbo_flags, vbo_sizes);
+
+	cudaGLUnmapBufferObject(cubeVBO_positions);
+	cudaGLUnmapBufferObject(cubeVBO_flags);
+	cudaGLUnmapBufferObject(cubeVBO_sizes);
+
 	GLint modelLoc = glGetUniformLocation(program[PROG_CUBE], "u_modelMatrix");
+	glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
 
-	glBindVertexArray(cubeVAO);
-	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
+	GLint viewLoc = glGetUniformLocation(program[PROG_CUBE], "u_viewMatrix");
+	glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &viewMatrix[0][0]);
 
+	GLint projLoc = glGetUniformLocation(program[PROG_CUBE], "u_projMatrix");
+	glm::mat4 projMatrix = glm::perspective(glm::radians(45.0f), 1200.0f / 600.0f, 0.1f, 100.0f);
+	glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projMatrix[0][0]);
+
+	glDrawArrays(GL_POINTS, 0, numTransCubes);
+
+	glBindVertexArray(0);
 	glUseProgram(0);
 
 	glfwSwapBuffers(secondWindow);
 }
-
-//void drawSecondWindow() {
-//	glfwMakeContextCurrent(secondWindow);
-//	glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
-//	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//
-//	float* dptrVertPositions = nullptr;
-//	float* dptrVertColors = nullptr;
-//	float* dptrVertSizes = nullptr;
-//	cudaGLMapBufferObject((void**)&dptrVertPositions, cubeVBO_positions);
-//	cudaGLMapBufferObject((void**)&dptrVertColors, cubeVBO_colors);
-//	cudaGLMapBufferObject((void**)&dptrVertSizes, cubeVBO_sizes);
-//
-//	copyCubesToVBO(dptrVertPositions, dptrVertColors, dptrVertSizes);
-//
-//	cudaGLUnmapBufferObject(cubeVBO_positions);
-//	cudaGLUnmapBufferObject(cubeVBO_colors);
-//	cudaGLUnmapBufferObject(cubeVBO_sizes);
-//
-//	glUseProgram(program[PROG_CUBE]);
-//	glBindVertexArray(cubeVAO);
-//	glDrawArrays(GL_POINTS, 0, numCubes);
-//	glBindVertexArray(0);
-//	glUseProgram(0);
-//
-//	glfwSwapBuffers(secondWindow);
-//}

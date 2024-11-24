@@ -17,6 +17,7 @@
 int main(int argc, char* argv[]) {
 	projectName = "Fast Globally Optimal ICP";
 	initPointCloud(argc, argv);
+	initSearchSpace();
 
 	if (initMainWindow() && initSecondWindow()) {
 		initBufferAndkdTree();
@@ -41,6 +42,54 @@ void initPointCloud(int argc, char** argv)
 	numModelPoints = modelBuffer.size();
 	numPoints = dataBuffer.size() + modelBuffer.size();
 	Logger(LogLevel::Info) << "Total " << numPoints << " points loaded!";
+}
+
+void initSearchSpace() {
+	transCubePosBuffer.clear();
+	transCubeSizeBuffer.clear();
+	transCubeFlagBuffer.clear();
+
+	float initialSize = 1.0f;
+	glm::vec3 initialPosition(0.0f, 0.0f, 0.0f);
+
+	transCubePosBuffer.push_back(initialPosition);
+	transCubeSizeBuffer.push_back(initialSize);
+	transCubeFlagBuffer.push_back(0);
+
+	const glm::vec3 offsets[8] = {
+		glm::vec3(-0.5f, -0.5f, -0.5f),
+		glm::vec3(0.5f, -0.5f, -0.5f),
+		glm::vec3(-0.5f,  0.5f, -0.5f),
+		glm::vec3(0.5f,  0.5f, -0.5f),
+		glm::vec3(-0.5f, -0.5f,  0.5f),
+		glm::vec3(0.5f, -0.5f,  0.5f),
+		glm::vec3(-0.5f,  0.5f,  0.5f),
+		glm::vec3(0.5f,  0.5f,  0.5f)
+	};
+
+	int parentStartIndex = 0;
+	int parentCount = 1;
+
+	for (int divideLevel = 1; divideLevel <= maxCubeDivide; ++divideLevel) {
+		float currentSize = initialSize / pow(2, divideLevel);
+
+		for (int parentIndex = parentStartIndex; parentIndex < parentStartIndex + parentCount; ++parentIndex) {
+			glm::vec3 parentPosition = transCubePosBuffer[parentIndex];
+
+			for (int childIndex = 0; childIndex < 8; ++childIndex) {
+				glm::vec3 childPosition = parentPosition + currentSize * offsets[childIndex];
+				transCubePosBuffer.push_back(childPosition);
+				transCubeSizeBuffer.push_back(currentSize);
+				transCubeFlagBuffer.push_back(divideLevel);
+			}
+		}
+
+		parentStartIndex += parentCount;
+		parentCount *= 8;
+	}
+
+	numTransCubes = transCubeFlagBuffer.size();
+	Logger(LogLevel::Info) << "Total " << numTransCubes << " cubes initialized!";
 }
 
 void initBufferAndkdTree()
