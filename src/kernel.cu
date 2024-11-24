@@ -84,16 +84,37 @@ __global__ void kernCopyColorsToVBO(int N, glm::vec3* col, float* vbo, float s_s
 
 __global__ void kernCopyCubeDataToVBO(
 	int numTransCubes, glm::vec3* posBuffer, int* flagBuffer, float* sizeBuffer,
-	float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
+	float* vbodptr_positions, int* vbodptr_flags) {
 
-	int index = threadIdx.x + (blockIdx.x * blockDim.x);
+	int index = threadIdx.x + blockIdx.x * blockDim.x;
 	if (index < numTransCubes) {
-		vbodptr_positions[3 * index + 0] = posBuffer[index].x;
-		vbodptr_positions[3 * index + 1] = posBuffer[index].y;
-		vbodptr_positions[3 * index + 2] = posBuffer[index].z;
+		glm::vec3 center = posBuffer[index];
+		float size = sizeBuffer[index];
+		int flag = flagBuffer[index];
 
-		vbodptr_flags[index] = flagBuffer[index];
-		vbodptr_sizes[index] = sizeBuffer[index];
+		// Define face offsets for a cube
+		const glm::vec3 faceOffsets[8] = {
+			glm::vec3(-0.5f, -0.5f, -0.5f),
+			glm::vec3(0.5f, -0.5f, -0.5f),
+			glm::vec3(0.5f,  0.5f, -0.5f),
+			glm::vec3(-0.5f,  0.5f, -0.5f),
+			glm::vec3(-0.5f, -0.5f,  0.5f),
+			glm::vec3(0.5f, -0.5f,  0.5f),
+			glm::vec3(0.5f,  0.5f,  0.5f),
+			glm::vec3(-0.5f,  0.5f,  0.5f)
+		};
+
+		for (int i = 0; i < 8; ++i) {
+			int vIdx = index * 8 + i; // 8 vertices per cube
+
+			glm::vec3 vertexPos = center + faceOffsets[i] * size;
+			vbodptr_positions[3 * vIdx + 0] = vertexPos.x;
+			vbodptr_positions[3 * vIdx + 1] = vertexPos.y;
+			vbodptr_positions[3 * vIdx + 2] = vertexPos.z;	
+
+		}
+
+		vbodptr_flags[index] = flag;
 	}
 }
 
@@ -164,26 +185,23 @@ void PointCloud::copyPointsToVBO(float* vbodptr_positions, float* vbodptr_colors
 	cudaDeviceSynchronize();
 }
 
-void PointCloud::copyTransCubesToVBO( float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
+void PointCloud::copyTransCubesToVBO( float* vbodptr_positions, int* vbodptr_flags) {
 	dim3 fullBlocksPerGrid((numTransCubes + blockSize - 1) / blockSize);
 	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
 		numTransCubes, dev_transCubePosBuffer, dev_transCubeFlagBuffer, dev_transCubeSizeBuffer,
-		vbodptr_positions, vbodptr_flags, vbodptr_sizes
-		);
+		vbodptr_positions, vbodptr_flags);
 	checkCUDAErrorWithLine("copyCubesToVBO failed!");
 	cudaDeviceSynchronize();
 }
 
-void PointCloud::copyRotCubesToVBO( float* vbodptr_positions, int* vbodptr_flags, float* vbodptr_sizes) {
+void PointCloud::copyRotCubesToVBO( float* vbodptr_positions, int* vbodptr_flags) {
 	dim3 fullBlocksPerGrid((numTransCubes + blockSize - 1) / blockSize);
 	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
 		numTransCubes, dev_rotCubePosBuffer, dev_rotCubeFlagBuffer, dev_rotCubeSizeBuffer,
-		vbodptr_positions, vbodptr_flags, vbodptr_sizes
-		);
+		vbodptr_positions, vbodptr_flags);
 	checkCUDAErrorWithLine("copyCubesToVBO failed!");
 	cudaDeviceSynchronize();
 }
-
 
 void PointCloud::cleanupBuffers() {
 	cudaFree(dev_pos);

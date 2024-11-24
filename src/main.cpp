@@ -45,10 +45,6 @@ void initPointCloud(int argc, char** argv)
 }
 
 void initSearchSpace() {
-	transCubePosBuffer.clear();
-	transCubeSizeBuffer.clear();
-	transCubeFlagBuffer.clear();
-
 	float initialSize = 1.0f;
 	glm::vec3 initialPosition(0.0f, 0.0f, 0.0f);
 

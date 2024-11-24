@@ -45,7 +45,7 @@ extern std::string deviceName;
 extern GLFWwindow* window;
 extern GLFWwindow* secondWindow;
 
-extern GLuint cubeVAO, cubeVBO_positions, cubeVBO_flags, cubeVBO_sizes;
+extern GLuint cubeVAO, cubeVBO_positions, cubeVBO_flags, cubeEBO;
 
 /**
 * Initialization of main window
@@ -290,10 +290,12 @@ bool initSecondWindow() {
 
 	cudaGLRegisterBufferObject(cubeVBO_positions);
 	cudaGLRegisterBufferObject(cubeVBO_flags);
-	cudaGLRegisterBufferObject(cubeVBO_sizes);
 
 	glEnable(GL_DEPTH_TEST);
 	initCubeShaders(program);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 
 	return true;
 }
@@ -306,40 +308,44 @@ void drawSecondWindow() {
 	glUseProgram(program[PROG_CUBE]);
 	glBindVertexArray(cubeVAO);
 
-	float* vbo_positions = NULL;
-	int* vbo_flags = NULL;
-	float* vbo_sizes = NULL;
+	// Map OpenGL buffer objects for CUDA
+	float* vbo_positions = nullptr;
+	int* vbo_flags = nullptr;
 
 	cudaGLMapBufferObject((void**)&vbo_positions, cubeVBO_positions);
 	cudaGLMapBufferObject((void**)&vbo_flags, cubeVBO_flags);
-	cudaGLMapBufferObject((void**)&vbo_sizes, cubeVBO_sizes);
 
-	if (!vbo_positions || !vbo_flags || !vbo_sizes) {
+	if (!vbo_positions || !vbo_flags) {
 		printf("Error: Null pointer passed to cube kernel!\n");
+		return;
 	}
 
-	PointCloud::copyTransCubesToVBO(vbo_positions, vbo_flags, vbo_sizes);
+	// Update vertex positions and flags
+	PointCloud::copyTransCubesToVBO(vbo_positions, vbo_flags);
 
+	// Unmap the buffer objects
 	cudaGLUnmapBufferObject(cubeVBO_positions);
 	cudaGLUnmapBufferObject(cubeVBO_flags);
-	cudaGLUnmapBufferObject(cubeVBO_sizes);
 
+	// Set uniform matrices
 	GLint modelLoc = glGetUniformLocation(program[PROG_CUBE], "u_modelMatrix");
 	glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
 
 	GLint viewLoc = glGetUniformLocation(program[PROG_CUBE], "u_viewMatrix");
-	glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	glm::mat4 viewMatrix = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -5.0f));
 	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, &viewMatrix[0][0]);
 
 	GLint projLoc = glGetUniformLocation(program[PROG_CUBE], "u_projMatrix");
 	glm::mat4 projMatrix = glm::perspective(glm::radians(45.0f), 1200.0f / 600.0f, 0.1f, 100.0f);
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projMatrix[0][0]);
 
-	glDrawArrays(GL_POINTS, 0, numTransCubes);
+	// Draw cubes
+	int verticesPerCube = 8; // 8 vertices per cube
+	int indicesPerCube = 36; // 36 indices per cube
+	glDrawElements(GL_TRIANGLES, numTransCubes * indicesPerCube, GL_UNSIGNED_INT, 0);
 
 	glBindVertexArray(0);
 	glUseProgram(0);
-
 	glfwSwapBuffers(secondWindow);
 }
