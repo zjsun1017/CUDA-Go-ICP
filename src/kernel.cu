@@ -73,6 +73,26 @@ __global__ void kernCopyColorsToVBO(int N, glm::vec3* col, float* vbo, float s_s
 	}
 }
 
+__global__ void kernCopyCubeDataToVBO(
+	int numCubes, int alpha, glm::vec3* posBuffer, glm::vec3* colBuffer, float* sizeBuffer,
+	float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
+
+	int index = threadIdx.x + (blockIdx.x * blockDim.x);
+	if (index < numCubes) {
+		vbodptr_positions[4 * index + 0] = posBuffer[index].x;
+		vbodptr_positions[4 * index + 1] = posBuffer[index].y;
+		vbodptr_positions[4 * index + 2] = posBuffer[index].z;
+		vbodptr_positions[4 * index + 3] = 1.0f;
+
+		vbodptr_colors[4 * index + 0] = colBuffer[index].x;
+		vbodptr_colors[4 * index + 1] = colBuffer[index].y;
+		vbodptr_colors[4 * index + 2] = colBuffer[index].z;
+		vbodptr_colors[4 * index + 3] = alpha;
+
+		vbodptr_sizes[index] = sizeBuffer[index];
+	}
+}
+
 void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm::vec3>& modelBuffer) {
 	// Use unified memory
 	cudaDeviceSynchronize();
@@ -133,6 +153,27 @@ void PointCloud::copyPointsToVBO(float* vbodptr_positions, float* vbodptr_colors
 
 	cudaDeviceSynchronize();
 }
+
+void PointCloud::copyTransCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
+	dim3 fullBlocksPerGrid((numCubes + blockSize - 1) / blockSize);
+	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
+		numCubes, alpha, dev_transCubePosBuffer, dev_transCubeColBuffer, dev_transCubeSizeBuffer,
+		vbodptr_positions, vbodptr_colors, vbodptr_sizes
+		);
+	checkCUDAErrorWithLine("copyCubesToVBO failed!");
+	cudaDeviceSynchronize();
+}
+
+void PointCloud::copyRotCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes) {
+	dim3 fullBlocksPerGrid((numCubes + blockSize - 1) / blockSize);
+	kernCopyCubeDataToVBO << <fullBlocksPerGrid, blockSize >> > (
+		numCubes, alpha, dev_rotCubePosBuffer, dev_rotCubeColBuffer, dev_rotCubeSizeBuffer,
+		vbodptr_positions, vbodptr_colors, vbodptr_sizes
+		);
+	checkCUDAErrorWithLine("copyCubesToVBO failed!");
+	cudaDeviceSynchronize();
+}
+
 
 void PointCloud::cleanupBuffers() {
 	cudaFree(dev_pos);

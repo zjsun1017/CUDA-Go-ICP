@@ -29,6 +29,34 @@ void initCubeVAO()
     glBindVertexArray(0);
 }
 
+//void initCubeVAO() {
+//    glGenVertexArrays(1, &cubeVAO);
+//    glGenBuffers(1, &cubeVBO_positions);
+//    glGenBuffers(1, &cubeVBO_colors);
+//    glGenBuffers(1, &cubeVBO_sizes);
+//
+//    glBindVertexArray(cubeVAO);
+//
+//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions);
+//    glBufferData(GL_ARRAY_BUFFER, numCubes * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+//    glEnableVertexAttribArray(0);
+//    glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+//
+//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_colors);
+//    glBufferData(GL_ARRAY_BUFFER, numCubes * 4 * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+//    glEnableVertexAttribArray(1);
+//    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+//
+//    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_sizes);
+//    glBufferData(GL_ARRAY_BUFFER, numCubes * sizeof(float), nullptr, GL_DYNAMIC_DRAW);
+//    glEnableVertexAttribArray(2);
+//    glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(float), (void*)0);
+//
+//    glBindVertexArray(0);
+//}
+
+
+
 void initCubeShaders(GLuint* program) {
     GLint location;
 

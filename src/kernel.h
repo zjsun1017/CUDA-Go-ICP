@@ -27,4 +27,6 @@ namespace PointCloud {
     void initBuffers(std::vector<glm::vec3>& Ybuffer, std::vector<glm::vec3>& Xbuffer);
     void copyPointsToVBO(float* vbodptr_positions, float* vbodptr_colors);
     void cleanupBuffers();
+    void copyTransCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes);
+    void copyRotCubesToVBO(float alpha, float* vbodptr_positions, float* vbodptr_colors, float* vbodptr_sizes);
 }

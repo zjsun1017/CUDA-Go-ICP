@@ -308,3 +308,30 @@ void drawSecondWindow() {
 
 	glfwSwapBuffers(secondWindow);
 }
+
+//void drawSecondWindow() {
+//	glfwMakeContextCurrent(secondWindow);
+//	glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
+//	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//
+//	float* dptrVertPositions = nullptr;
+//	float* dptrVertColors = nullptr;
+//	float* dptrVertSizes = nullptr;
+//	cudaGLMapBufferObject((void**)&dptrVertPositions, cubeVBO_positions);
+//	cudaGLMapBufferObject((void**)&dptrVertColors, cubeVBO_colors);
+//	cudaGLMapBufferObject((void**)&dptrVertSizes, cubeVBO_sizes);
+//
+//	copyCubesToVBO(dptrVertPositions, dptrVertColors, dptrVertSizes);
+//
+//	cudaGLUnmapBufferObject(cubeVBO_positions);
+//	cudaGLUnmapBufferObject(cubeVBO_colors);
+//	cudaGLUnmapBufferObject(cubeVBO_sizes);
+//
+//	glUseProgram(program[PROG_CUBE]);
+//	glBindVertexArray(cubeVAO);
+//	glDrawArrays(GL_POINTS, 0, numCubes);
+//	glBindVertexArray(0);
+//	glUseProgram(0);
+//
+//	glfwSwapBuffers(secondWindow);
+//}
