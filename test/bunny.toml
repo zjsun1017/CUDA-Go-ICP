@@ -4,7 +4,7 @@
 authors = ["Mufeng Xu"]
 affiliation = "GRASP Lab, University of Pennsylvania"
 version = "0.1"
-description = "Register chin.ply with model_bunny.ply"
+description = "Register data point cloud with model point cloud"
 
 [io]
 target = "../data/bunny/bun045.ply"    # target (reference) point cloud

@@ -1,6 +1,18 @@
 # pragma once
 #include "kernel.h"
 
+inline int ilog2(int x) {
+    int lg = 0;
+    while (x >>= 1) {
+        ++lg;
+    }
+    return lg;
+}
+
+inline int ilog2ceil(int x) {
+    return x == 1 ? 0 : ilog2(x - 1) + 1;
+}
+
 struct Correspondence
 {
     size_t idx_s;
