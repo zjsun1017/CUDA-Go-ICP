@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 	projectName = "Fast Globally Optimal ICP";
 	initPointCloud(argc, argv);
 
-	if (initMainWindow()) {
+	if (initMainWindow() && initSecondWindow()) {
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
@@ -96,10 +96,13 @@ void mainLoop() {
 		glfwSetWindowTitle(window, ss.str().c_str());
 
 		runCUDA();
-		drawMainWindow();
-		glfwSwapBuffers(window);
+		drawMainWindow(); 
+		drawSecondWindow();
+
+		glfwPollEvents();
 	}
 	glfwDestroyWindow(window);
+	glfwDestroyWindow(secondWindow);
 	glfwTerminate();
 }
 

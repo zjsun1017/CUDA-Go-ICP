@@ -21,7 +21,40 @@
 #include <vector>
 #include <algorithm>
 
-void initCubes(int gridSize, float cubeSize, const glm::vec3& sphereCenter, float sphereRadius);
-void drawCubes(GLuint program);
-void initSphere(const glm::vec3& center, float radius);
-void drawSphere(GLuint program, const glm::vec3& center, float radius);
+//Cube Setup
+const GLfloat cubeVertices[] = {
+    // Positions           // Colors
+    -0.5f, -0.5f, -0.5f,   1.0f, 0.0f, 0.0f, // Bottom-left
+     0.5f, -0.5f, -0.5f,   0.0f, 1.0f, 0.0f, // Bottom-right
+     0.5f,  0.5f, -0.5f,   0.0f, 0.0f, 1.0f, // Top-right
+    -0.5f,  0.5f, -0.5f,   1.0f, 1.0f, 0.0f, // Top-left
+
+    -0.5f, -0.5f,  0.5f,   1.0f, 0.0f, 1.0f, // Bottom-left (back)
+     0.5f, -0.5f,  0.5f,   0.0f, 1.0f, 1.0f, // Bottom-right (back)
+     0.5f,  0.5f,  0.5f,   1.0f, 1.0f, 1.0f, // Top-right (back)
+    -0.5f,  0.5f,  0.5f,   0.5f, 0.5f, 0.5f  // Top-left (back)
+};
+
+const GLuint cubeIndices[] = {
+    // Front face
+    0, 1, 2,
+    2, 3, 0,
+    // Back face
+    4, 5, 6,
+    6, 7, 4,
+    // Left face
+    0, 4, 7,
+    7, 3, 0,
+    // Right face
+    1, 5, 6,
+    6, 2, 1,
+    // Top face
+    3, 7, 6,
+    6, 2, 3,
+    // Bottom face
+    0, 1, 5,
+    5, 4, 0
+};
+
+void initCubeVAO();
+void initCubeShaders(GLuint* program);

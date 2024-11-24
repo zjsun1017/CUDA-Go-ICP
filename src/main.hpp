@@ -46,6 +46,15 @@ glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
+int numCubes = 100;
+glm::vec3* dev_transCubePosBuffer;
+glm::vec3* dev_transCubeColBuffer;
+float* dev_transCubeSizeBuffer;
+
+glm::vec3* dev_rotCubePosBuffer;
+glm::vec3* dev_rotCubeColBuffer;
+float* dev_rotCubeSizeBuffer;
+
 std::string deviceName;
 GLFWwindow* window;
 GLFWwindow* secondWindow;

@@ -162,13 +162,13 @@ void attachAndLinkProgram(GLuint program, shaders_t shaders) {
 GLuint createProgram(
     const char *vertexShaderPath,
     const char *fragmentShaderPath,
-    const char *attributeLocations[], GLuint numberOfLocations) {
+    const char *pointAttributeLocations[], GLuint numberOfLocations) {
     glslUtility::shaders_t shaders = glslUtility::loadShaders(vertexShaderPath, NULL, fragmentShaderPath);
 
     GLuint program = glCreateProgram();
 
     for (GLuint i = 0; i < numberOfLocations; ++i) {
-        glBindAttribLocation(program, i, attributeLocations[i]);
+        glBindAttribLocation(program, i, pointAttributeLocations[i]);
     }
 
     glslUtility::attachAndLinkProgram(program, shaders);
@@ -180,13 +180,13 @@ GLuint createProgram(
     const char *vertexShaderPath,
     const char *geometryShaderPath,
     const char *fragmentShaderPath,
-    const char *attributeLocations[], GLuint numberOfLocations) {
+    const char *pointAttributeLocations[], GLuint numberOfLocations) {
     glslUtility::shaders_t shaders = glslUtility::loadShaders(vertexShaderPath, geometryShaderPath, fragmentShaderPath);
 
     GLuint program = glCreateProgram();
 
     for (GLuint i = 0; i < numberOfLocations; ++i) {
-        glBindAttribLocation(program, i, attributeLocations[i]);
+        glBindAttribLocation(program, i, pointAttributeLocations[i]);
     }
 
     glslUtility::attachAndLinkProgram(program, shaders);

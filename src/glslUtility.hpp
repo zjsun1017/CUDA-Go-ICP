@@ -11,15 +11,15 @@
 #include <GL/glew.h>
 
 namespace glslUtility {
-GLuint createDefaultProgram(const char *attributeLocations[],
+GLuint createDefaultProgram(const char *pointAttributeLocations[],
                             GLuint numberOfLocations);
 GLuint createProgram(const char *vertexShaderPath,
                      const char *fragmentShaderPath,
-                     const char *attributeLocations[],
+                     const char *pointAttributeLocations[],
                      GLuint numberOfLocations);
 GLuint createProgram(const char *vertexShaderPath,
                      const char *geometryShaderPath,
                      const char *fragmentShaderPath,
-                     const char *attributeLocations[],
+                     const char *pointAttributeLocations[],
                      GLuint numberOfLocations);
 }

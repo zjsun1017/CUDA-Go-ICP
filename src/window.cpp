@@ -1,21 +1,20 @@
 #include "window.h"
+#include "scene.h"
 
 //====================================
-// GL Stuff
+// GL Stuff for Main Window
 //====================================
 
 GLuint positionLocation = 0;   // Match results from glslUtility::createProgram.
 GLuint colorsLocation = 1; // Also see attribtueLocations below.
-const char* attributeLocations[] = { "Position", "Velocity" };
+const char* pointAttributeLocations[] = { "Position", "Color" };
 
 GLuint pointVAO = 0;
 GLuint pointVBO_positions = 0;
 GLuint pointVBO_colors = 0;
 GLuint pointIBO = 0;
-GLuint displayImage;
-GLuint program[2];
 
-const unsigned int PROG_POINT = 0;
+GLuint program[3];
 
 const float fovy = (float)(PI / 4);
 const float zNear = 0.0001f;
@@ -164,7 +163,7 @@ void initPointShaders(GLuint* program) {
 	program[PROG_POINT] = glslUtility::createProgram(
 		"shaders/point.vert.glsl",
 		"shaders/point.geom.glsl",
-		"shaders/point.frag.glsl", attributeLocations, 2);
+		"shaders/point.frag.glsl", pointAttributeLocations, 2);
 	glUseProgram(program[PROG_POINT]);
 
 	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
@@ -177,6 +176,7 @@ void initPointShaders(GLuint* program) {
 
 void drawMainWindow()
 {
+	glfwMakeContextCurrent(window);
 	// Map OpenGL buffer object for writing from CUDA on a single GPU
 	// No data is moved (Win & Linux). When mapped to CUDA, OpenGL should not
 	// use this buffer
@@ -202,6 +202,7 @@ void drawMainWindow()
 
 	glUseProgram(0);
 	glBindVertexArray(0);
+	glfwSwapBuffers(window);
 }
 
 // Call back and camera functions
@@ -254,4 +255,56 @@ void updateCamera() {
 	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
 		glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 	}
+}
+
+bool initSecondWindow() {
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+
+	secondWindow = glfwCreateWindow(1200, 600, "Second Window", NULL, window);
+	if (!secondWindow) {
+		std::cout << "Error: Could not create second GLFW window!" << std::endl;
+		glfwTerminate();
+		return false;
+	}
+
+	glfwMakeContextCurrent(secondWindow);
+
+	glewExperimental = GL_TRUE;
+	if (glewInit() != GLEW_OK) {
+		std::cout << "Error: Could not initialize GLEW for second window!" << std::endl;
+		return false;
+	}
+
+	glEnable(GL_DEPTH_TEST);
+
+	initCubeVAO();
+	initCubeShaders(program);
+
+	return true;
+}
+
+extern const char* cubeAttributeLocations[];
+extern GLuint cubeVAO, cubeVBO, cubeEBO;
+
+void drawSecondWindow() {
+	glfwMakeContextCurrent(secondWindow);
+	glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(program[PROG_CUBE]);
+
+	glm::mat4 modelMatrix = glm::rotate(glm::mat4(1.0f), (float)glfwGetTime(), glm::vec3(0.5f, 1.0f, 0.0f));
+	GLint modelLoc = glGetUniformLocation(program[PROG_CUBE], "u_modelMatrix");
+	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, &modelMatrix[0][0]);
+
+	glBindVertexArray(cubeVAO);
+	glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
+
+	glUseProgram(0);
+
+	glfwSwapBuffers(secondWindow);
 }
