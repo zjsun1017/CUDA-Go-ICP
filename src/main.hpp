@@ -47,8 +47,8 @@ glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
 
-int maxCubeDivide = 3;
-int numTransCubes = 0;
+int maxCubeDivide = 6;
+int numCubes = 0;
 
 std::vector<glm::vec3> transCubePosBuffer;
 std::vector<glm::vec3> transCubeColBuffer;
@@ -56,11 +56,8 @@ std::vector<glm::vec3> transCubeColBuffer;
 std::vector<glm::vec3> rotCubePosBuffer;
 std::vector<glm::vec3> rotCubeColBuffer;
 
-glm::vec3* dev_transCubePosBuffer;
-glm::vec3* dev_transCubeColBuffer;
-
-glm::vec3* dev_rotCubePosBuffer;
-glm::vec3* dev_rotCubeColBuffer;
+glm::vec3* dev_cubePosBuffer;
+glm::vec3* dev_cubeColBuffer;
 
 std::string deviceName;
 GLFWwindow* window;

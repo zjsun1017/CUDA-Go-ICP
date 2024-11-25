@@ -46,10 +46,12 @@ void initPointCloud(int argc, char** argv)
 
 void initSearchSpace() {
 	float initialSize = 1.0f;
-	glm::vec3 initialPosition(0.0f, 0.0f, 0.0f);
 
-	transCubePosBuffer.push_back(initialPosition);
+	transCubePosBuffer.push_back(glm::vec3(-1.0f, 0.0f, 0.0f));
 	transCubeColBuffer.push_back(glm::vec3(1.0f));
+
+	rotCubePosBuffer.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
+	rotCubeColBuffer.push_back(glm::vec3(1.0f));
 
 	const glm::vec3 offsets[8] = {
 		glm::vec3(-0.5f, -0.5f, -0.5f),
@@ -69,12 +71,40 @@ void initSearchSpace() {
 		float currentSize = initialSize / pow(2, divideLevel);
 
 		for (int parentIndex = parentStartIndex; parentIndex < parentStartIndex + parentCount; ++parentIndex) {
-			glm::vec3 parentPosition = transCubePosBuffer[parentIndex];
+			glm::vec3 parentPositionTrans = transCubePosBuffer[parentIndex];
 
 			for (int childIndex = 0; childIndex < 8; ++childIndex) {
-				glm::vec3 childPosition = parentPosition + currentSize * offsets[childIndex];
-				transCubePosBuffer.push_back(childPosition);
+				glm::vec3 childPositionTrans = parentPositionTrans + currentSize * offsets[childIndex];
+
+				transCubePosBuffer.push_back(childPositionTrans);
 				transCubeColBuffer.push_back(glm::vec3(1.0f));
+			}
+		}
+
+		for (int parentIndex = parentStartIndex; parentIndex < parentStartIndex + parentCount; ++parentIndex) {
+			glm::vec3 parentPositionRot = rotCubePosBuffer[parentIndex];
+
+			for (int childIndex = 0; childIndex < 8; ++childIndex) {
+				glm::vec3 childPositionRot = parentPositionRot + currentSize * offsets[childIndex];
+
+				rotCubePosBuffer.push_back(childPositionRot);
+
+				float sphereRadius = sqrt(3) / 4;
+				glm::vec3 sphereCenter(1.0f, 0.0f, 0.0f);
+
+				glm::vec3 cubeMin = childPositionRot - glm::vec3(currentSize / 2.0f);
+				glm::vec3 cubeMax = childPositionRot + glm::vec3(currentSize / 2.0f);
+
+				glm::vec3 closestPointOnCube = glm::clamp(sphereCenter, cubeMin, cubeMax);
+
+				float dist = glm::distance(closestPointOnCube, sphereCenter);
+
+				if (dist > sphereRadius) {
+					rotCubeColBuffer.push_back(glm::vec3(0.01f));
+				}
+				else {
+					rotCubeColBuffer.push_back(glm::vec3(1.0f));
+				}
 			}
 		}
 
@@ -82,8 +112,8 @@ void initSearchSpace() {
 		parentCount *= 8;
 	}
 
-	numTransCubes = transCubeColBuffer.size();
-	Logger(LogLevel::Info) << "Total " << numTransCubes << " cubes initialized!";
+	numCubes = transCubeColBuffer.size();
+	Logger(LogLevel::Info) << "Total " << numCubes << " search cubes initialized!";
 }
 
 void initBufferAndkdTree()
