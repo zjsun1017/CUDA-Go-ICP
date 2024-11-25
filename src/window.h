@@ -38,5 +38,7 @@ void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
 void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
 
 //Second window
+void initCubeVAO();
+void initCubeShaders(GLuint* program);
 bool initSecondWindow();
 void drawSecondWindow();

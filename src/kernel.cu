@@ -1,7 +1,6 @@
 #define GLM_FORCE_CUDA
 #include "kernel.h"
 
-
 extern int numPoints;
 extern int numDataPoints;
 extern int numModelPoints;
@@ -136,7 +135,6 @@ void PointCloud::copyPointsToVBO(int N, glm::vec3* posBuffer, glm::vec3* colBuff
 	kernCopyPositionsToVBO << <fullBlocksPerGrid, blockSize >> > (N, posBuffer, vbodptr_positions, scene_scale);
 	kernCopyColorsToVBO << <fullBlocksPerGrid, blockSize >> > (N, colBuffer, vbodptr_colors, scene_scale);
 	checkCUDAErrorWithLine("copyPointsToVBO failed!");
-
 	cudaDeviceSynchronize();
 }
 
@@ -152,7 +150,8 @@ void PointCloud::cleanupBuffers() {
 	cudaFree(dev_fkdt);
 	cudaFree(dev_minDists);
 	cudaFree(dev_minIndices);
-
+	cudaFree(dev_cubePosBuffer);
+	cudaFree(dev_cubeColBuffer);
 	checkCUDAErrorWithLine("cudaFree failed!");
 }
 
