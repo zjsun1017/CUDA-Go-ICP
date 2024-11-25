@@ -4,62 +4,63 @@
 extern int numTransCubes;
 
 extern std::vector<glm::vec3> transCubePosBuffer;
-extern std::vector<int> transCubeFlagBuffer;
+extern std::vector<int> transCubeColBuffer;
 extern std::vector<float> transCubeSizeBuffer;
 
-GLuint cubeVAO = 0, cubeVBO_positions = 0, cubeVBO_flags = 0, cubeEBO = 0;
+GLuint cubeVAO = 0;
+GLuint cubeVBO_positions = 0;
+GLuint cubeVBO_colors = 0;
+GLuint cubeIBO = 0;
+
+extern GLuint positionLocation;   
+extern GLuint colorsLocation;
 
 void initCubeVAO() {
-    const GLuint cubeIndices[] = {
-        // Front face
-        0, 1, 2, 2, 3, 0,
-        // Back face
-        4, 5, 6, 6, 7, 4,
-        // Left face
-        0, 4, 7, 7, 3, 0,
-        // Right face
-        1, 5, 6, 6, 2, 1,
-        // Top face
-        3, 7, 6, 6, 2, 3,
-        // Bottom face
-        0, 1, 5, 5, 4, 0
-    };
+	std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (numTransCubes)] };
+	std::unique_ptr<GLuint[]> bindices{ new GLuint[numTransCubes] };
 
-    // Initialize buffers
-    glGenVertexArrays(1, &cubeVAO);
-    glGenBuffers(1, &cubeVBO_positions);
-    glGenBuffers(1, &cubeVBO_flags);
-    glGenBuffers(1, &cubeEBO); // Generate the EBO
+	glm::vec4 ul(-1.0, -1.0, 1.0, 1.0);
+	glm::vec4 lr(1.0, 1.0, 0.0, 0.0);
 
-    glBindVertexArray(cubeVAO);
+	for (int i = 0; i < numTransCubes; i++) {
+		bodies[4 * i + 0] = 0.0f;
+		bodies[4 * i + 1] = 0.0f;
+		bodies[4 * i + 2] = 0.0f;
+		bodies[4 * i + 3] = 1.0f;
+		bindices[i] = i;
+	}
 
-    // Upload positions
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * 8 * numTransCubes, nullptr, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+	glGenVertexArrays(1, &cubeVAO); 
+	glGenBuffers(1, &cubeVBO_positions);
+	glGenBuffers(1, &cubeVBO_colors);
+	glGenBuffers(1, &cubeIBO);
 
-    // Upload flags
-    glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_flags);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(int) * numTransCubes, nullptr, GL_DYNAMIC_DRAW);
-    glEnableVertexAttribArray(1);
-    glVertexAttribIPointer(1, 1, GL_INT, 0, (void*)0);
+	glBindVertexArray(cubeVAO);
 
-    // Upload indices
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeEBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndices), cubeIndices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions); // bind the buffer
+	glBufferData(GL_ARRAY_BUFFER, 4 * (numTransCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(positionLocation);
+	glVertexAttribPointer((GLuint)positionLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
-    glBindVertexArray(0); // Unbind VAO
+	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_colors);
+	glBufferData(GL_ARRAY_BUFFER, 4 * (numTransCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(colorsLocation);
+	glVertexAttribPointer((GLuint)colorsLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (numTransCubes) * sizeof(GLuint), bindices.get(), GL_STATIC_DRAW);
+
+	glBindVertexArray(0);
 }
 
 void initCubeShaders(GLuint* program) {
     GLint location;
-    const char* cubeAttributeLocations[] = {"vertPos", "Flag"};
+    const char* cubeAttributeLocations[] = { "Position", "Color" };
 
     program[PROG_CUBE] = glslUtility::createProgram(
         "shaders/cube.vert.glsl",
-        nullptr,
-        "shaders/cube.frag.glsl",
+        "shaders/cube.geom.glsl",
+        "shaders/point.frag.glsl",
         cubeAttributeLocations,
         2
     );
@@ -67,12 +68,12 @@ void initCubeShaders(GLuint* program) {
     glUseProgram(program[PROG_CUBE]);
 
     if ((location = glGetUniformLocation(program[PROG_CUBE], "u_projMatrix")) != -1) {
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.00001f, 100000.0f);
         glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
     }
 
     if ((location = glGetUniformLocation(program[PROG_CUBE], "u_viewMatrix")) != -1) {
-        glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -2.0f));
+        glm::mat4 view = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -20.0f));
         glUniformMatrix4fv(location, 1, GL_FALSE, &view[0][0]);
     }
 
@@ -81,6 +82,5 @@ void initCubeShaders(GLuint* program) {
         glUniformMatrix4fv(location, 1, GL_FALSE, &modelMatrix[0][0]);
     }
 }
-
 
 

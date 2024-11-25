@@ -49,8 +49,7 @@ void initSearchSpace() {
 	glm::vec3 initialPosition(0.0f, 0.0f, 0.0f);
 
 	transCubePosBuffer.push_back(initialPosition);
-	transCubeSizeBuffer.push_back(initialSize);
-	transCubeFlagBuffer.push_back(0);
+	transCubeColBuffer.push_back(glm::vec3(1.0f));
 
 	const glm::vec3 offsets[8] = {
 		glm::vec3(-0.5f, -0.5f, -0.5f),
@@ -75,8 +74,7 @@ void initSearchSpace() {
 			for (int childIndex = 0; childIndex < 8; ++childIndex) {
 				glm::vec3 childPosition = parentPosition + currentSize * offsets[childIndex];
 				transCubePosBuffer.push_back(childPosition);
-				transCubeSizeBuffer.push_back(currentSize);
-				transCubeFlagBuffer.push_back(divideLevel);
+				transCubeColBuffer.push_back(glm::vec3(1.0f));
 			}
 		}
 
@@ -84,7 +82,7 @@ void initSearchSpace() {
 		parentCount *= 8;
 	}
 
-	numTransCubes = transCubeFlagBuffer.size();
+	numTransCubes = transCubeColBuffer.size();
 	Logger(LogLevel::Info) << "Total " << numTransCubes << " cubes initialized!";
 }
 

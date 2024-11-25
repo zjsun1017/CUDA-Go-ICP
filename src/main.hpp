@@ -51,20 +51,16 @@ int maxCubeDivide = 3;
 int numTransCubes = 0;
 
 std::vector<glm::vec3> transCubePosBuffer;
-std::vector<int> transCubeFlagBuffer;
-std::vector<float> transCubeSizeBuffer;
+std::vector<glm::vec3> transCubeColBuffer;
 
 std::vector<glm::vec3> rotCubePosBuffer;
-std::vector<int> rotCubeFlagBuffer;
-std::vector<float> rotCubeSizeBuffer;
+std::vector<glm::vec3> rotCubeColBuffer;
 
 glm::vec3* dev_transCubePosBuffer;
-int* dev_transCubeFlagBuffer;
-float* dev_transCubeSizeBuffer;
+glm::vec3* dev_transCubeColBuffer;
 
 glm::vec3* dev_rotCubePosBuffer;
-int* dev_rotCubeFlagBuffer;
-float* dev_rotCubeSizeBuffer;
+glm::vec3* dev_rotCubeColBuffer;
 
 std::string deviceName;
 GLFWwindow* window;
