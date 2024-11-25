@@ -1,12 +1,12 @@
 #pragma once
 
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
 #include <iostream>
 #include <cstdlib>
 #include <string>
 #include <sstream>
 #include <fstream>
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 #include <cuda_runtime.h>
 #include <cuda_gl_interop.h>
 #include <glm/glm.hpp>
@@ -22,71 +22,56 @@
 #include <vector>
 #include <algorithm>
 
-//====================================
-// GL Stuff
-//====================================
+int numPoints = 0;
+int numDataPoints = 0;
+int numModelPoints = 0;
 
-GLuint positionLocation = 0;   // Match results from glslUtility::createProgram.
-GLuint colorsLocation = 1; // Also see attribtueLocations below.
-const char *attributeLocations[] = { "Position", "Velocity" };
+PointCloudAdaptor tree;
+KDTree kdtree(3, tree, nanoflann::KDTreeSingleIndexAdaptorParams(10));
+FlattenedKDTree* dev_fkdt;
+float* dev_minDists;
+size_t* dev_minIndices;
 
-GLuint pointVAO = 0;
-GLuint pointVBO_positions = 0;
-GLuint pointVBO_colors = 0;
-GLuint pointIBO = 0;
-GLuint displayImage;
-GLuint program[2];
+std::vector<glm::vec3> dataBuffer;
+std::vector<glm::vec3> modelBuffer;
 
-const unsigned int PROG_POINT = 0;
+glm::vec3* dev_pos;
+glm::vec3* dev_col;
 
-const float fovy = (float) (PI / 4);
-const float zNear = 0.0001f;
-const float zFar = 10000.0f;
-int width = 1280;
-int height = 720;
-int pointSize = 2;
+glm::vec3* dev_dataBuffer;
+glm::vec3* dev_modelBuffer;
+glm::vec3* dev_corrBuffer;
 
-// For camera controls
-bool leftMousePressed = false;
-bool rightMousePressed = false;
-double lastX;
-double lastY;
-float theta = 1.5f;
-float phi = 1.0f;
-float zoom = 5.0f;
-glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.5f);
-glm::vec3 cameraPosition;
-glm::mat4 projection;
+glm::vec3* dev_centeredCorrBuffer;
+glm::vec3* dev_centeredDataBuffer;
+glm::mat3* dev_ABtBuffer;
 
-//====================================
-// Main
-//====================================
 
-inline int ilog2(int x) {
-	int lg = 0;
-	while (x >>= 1) {
-		++lg;
-	}
-	return lg;
-}
+int maxCubeDivide = 3;
+int numTransCubes = 0;
 
-inline int ilog2ceil(int x) {
-	return x == 1 ? 0 : ilog2(x - 1) + 1;
-}
+std::vector<glm::vec3> transCubePosBuffer;
+std::vector<glm::vec3> transCubeColBuffer;
 
+std::vector<glm::vec3> rotCubePosBuffer;
+std::vector<glm::vec3> rotCubeColBuffer;
+
+glm::vec3* dev_transCubePosBuffer;
+glm::vec3* dev_transCubeColBuffer;
+
+glm::vec3* dev_rotCubePosBuffer;
+glm::vec3* dev_rotCubeColBuffer;
+
+std::string deviceName;
+GLFWwindow* window;
+GLFWwindow* secondWindow;
 
 const char *projectName;
-
 int main(int argc, char* argv[]);
 
 void mainLoop();
-void errorCallback(int error, const char *description);
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-void mousePositionCallback(GLFWwindow* window, double xpos, double ypos);
-void updateCamera();
 void runCUDA();
 
-bool init(int argc, char **argv);
-void initVAO();
-void initShaders(GLuint *program);
+void initPointCloud(int argc, char** argv);
+void initSearchSpace();
+void initBufferAndkdTree();

@@ -88,7 +88,7 @@ void Config::parse_toml(const std::string toml_filepath)
         translation.zmax = translation_section["zmax"].value_or(1.0f);
     }
 
-    Logger(LogLevel::Info) << "Config parsed successfully";
+    Logger(LogLevel::Info) << "Config parsed successfully!";
 }
 
 size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, std::vector<glm::vec3>& cloud)
@@ -156,6 +156,7 @@ size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, s
         throw std::runtime_error(std::string("Error reading PLY file: ") + err.what());
     }
 
+    Logger(LogLevel::Info) << "Point cloud " << ply_filepath << " loaded with " << num_points << " points!";
     return num_points;
 }
 
@@ -212,6 +213,7 @@ size_t load_cloud_txt(const std::string& txt_filepath, const float& subsample, s
         throw std::runtime_error(std::string("Error reading TXT file: ") + err.what());
     }
 
+    Logger(LogLevel::Info) << "Point cloud "<< txt_filepath << " loaded with " << num_points << " points!";
     return num_points;
 }
 
