@@ -4,7 +4,7 @@
 #define VISUALIZE 1
 #define CUDA_NAIVE 0
 #define CUDA_KDTREE	0
-#define CPU_GOICP 0
+#define CPU_GOICP 1
 #define SUBSAMPLE 1 // Subsample data point cloud
 
 #if SUBSAMPLE
