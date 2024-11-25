@@ -1,7 +1,7 @@
 #include "scene.h"
 #include "window.h"
 
-extern int numTransCubes;
+extern int numCubes;
 
 extern std::vector<glm::vec3> transCubePosBuffer;
 extern std::vector<int> transCubeColBuffer;
@@ -16,13 +16,13 @@ extern GLuint positionLocation;
 extern GLuint colorsLocation;
 
 void initCubeVAO() {
-	std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (numTransCubes)] };
-	std::unique_ptr<GLuint[]> bindices{ new GLuint[numTransCubes] };
+	std::unique_ptr<GLfloat[]> bodies{ new GLfloat[4 * (2 * numCubes)] };
+	std::unique_ptr<GLuint[]> bindices{ new GLuint[2 * numCubes] };
 
 	glm::vec4 ul(-1.0, -1.0, 1.0, 1.0);
 	glm::vec4 lr(1.0, 1.0, 0.0, 0.0);
 
-	for (int i = 0; i < numTransCubes; i++) {
+	for (int i = 0; i < 2 * numCubes; i++) {
 		bodies[4 * i + 0] = 0.0f;
 		bodies[4 * i + 1] = 0.0f;
 		bodies[4 * i + 2] = 0.0f;
@@ -38,17 +38,17 @@ void initCubeVAO() {
 	glBindVertexArray(cubeVAO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_positions); // bind the buffer
-	glBufferData(GL_ARRAY_BUFFER, 4 * (numTransCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 4 * (2 * numCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(positionLocation);
 	glVertexAttribPointer((GLuint)positionLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
 	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO_colors);
-	glBufferData(GL_ARRAY_BUFFER, 4 * (numTransCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, 4 * (2 * numCubes) * sizeof(GLfloat), bodies.get(), GL_DYNAMIC_DRAW);
 	glEnableVertexAttribArray(colorsLocation);
 	glVertexAttribPointer((GLuint)colorsLocation, 4, GL_FLOAT, GL_FALSE, 0, 0);
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (numTransCubes) * sizeof(GLuint), bindices.get(), GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, (2 * numCubes) * sizeof(GLuint), bindices.get(), GL_STATIC_DRAW);
 
 	glBindVertexArray(0);
 }

@@ -39,7 +39,7 @@ extern int numPoints;
 extern int numDataPoints;
 extern int numModelPoints;
 
-extern int numTransCubes;
+extern int numCubes;
 
 extern std::string deviceName;
 extern GLFWwindow* window;
@@ -52,8 +52,8 @@ extern GLuint cubeIBO;
 
 extern glm::vec3* dev_pos;
 extern glm::vec3* dev_col;
-extern glm::vec3* dev_transCubePosBuffer;
-extern glm::vec3* dev_transCubeColBuffer;
+extern glm::vec3* dev_cubePosBuffer;
+extern glm::vec3* dev_cubeColBuffer;
 
 /**
 * Initialization of main window
@@ -301,6 +301,7 @@ bool initSecondWindow() {
 	cudaGLRegisterBufferObject(cubeVBO_colors);
 
 	glEnable(GL_DEPTH_TEST);
+
 	initCubeShaders(program);
 	return true;
 }
@@ -323,7 +324,7 @@ void drawSecondWindow() {
 	}
 
 	// Update vertex positions and flags
-	PointCloud::copyPointsToVBO(numTransCubes,dev_transCubePosBuffer, dev_transCubeColBuffer, vbo_positions, vbo_colors);
+	PointCloud::copyPointsToVBO(2 * numCubes,dev_cubePosBuffer, dev_cubeColBuffer, vbo_positions, vbo_colors);
 
 	// Unmap the buffer objects
 	cudaGLUnmapBufferObject(cubeVBO_positions);
@@ -343,8 +344,7 @@ void drawSecondWindow() {
 	glUniformMatrix4fv(projLoc, 1, GL_FALSE, &projMatrix[0][0]);
 
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	glDrawElements(GL_POINTS, numTransCubes + 1, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_POINTS, 2 * numCubes + 1, GL_UNSIGNED_INT, 0);
 	glPointSize(2.0f);
 
 	glBindVertexArray(0);

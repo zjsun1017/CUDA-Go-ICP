@@ -21,7 +21,7 @@ extern FlattenedKDTree* dev_fkdt;
 extern float* dev_minDists;
 extern size_t* dev_minIndices;
 
-extern int numTransCubes;
+extern int numCubes;
 
 extern std::vector<glm::vec3> transCubePosBuffer;
 extern std::vector<glm::vec3> transCubeColBuffer;
@@ -29,8 +29,8 @@ extern std::vector<glm::vec3> transCubeColBuffer;
 extern std::vector<glm::vec3> rotCubePosBuffer;
 extern std::vector<glm::vec3> rotCubeColBuffer;
 
-extern glm::vec3* dev_transCubePosBuffer;
-extern glm::vec3* dev_transCubeColBuffer;
+extern glm::vec3* dev_cubePosBuffer;
+extern glm::vec3* dev_cubeColBuffer;
 
 extern glm::vec3* dev_rotCubePosBuffer;
 extern glm::vec3* dev_rotCubeColBuffer;
@@ -72,9 +72,9 @@ __global__ void kernCopyColorsToVBO(int N, glm::vec3* col, float* vbo, float s_s
 	int index = threadIdx.x + (blockIdx.x * blockDim.x);
 
 	if (index < N) {
-		vbo[4 * index + 0] = col[index].x + 0.3f;
-		vbo[4 * index + 1] = col[index].y + 0.3f;
-		vbo[4 * index + 2] = col[index].z + 0.3f;
+		vbo[4 * index + 0] = col[index].x;
+		vbo[4 * index + 1] = col[index].y;
+		vbo[4 * index + 2] = col[index].z;
 		vbo[4 * index + 3] = 1.0f;
 	}
 }
@@ -103,14 +103,10 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
-	cudaMallocManaged((void**)&dev_transCubePosBuffer, numTransCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_transCubeColBuffer, numTransCubes * sizeof(glm::vec3));
+	cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
+	checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
+	cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
-	cudaMallocManaged((void**)&dev_rotCubePosBuffer, numTransCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_rotCubeColBuffer, numTransCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_rotCubeColBuffer failed!");
 
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
@@ -127,8 +123,11 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaDeviceSynchronize();
 
 	// Set search buffer
-	std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_transCubePosBuffer);
-	std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_transCubeColBuffer);
+	std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_cubePosBuffer);
+	std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
+	std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
+	std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
+
 	cudaDeviceSynchronize();
 }
 
