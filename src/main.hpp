@@ -47,7 +47,7 @@ glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
 
-int maxCubeDivide = 6;
+int maxCubeDivide = 3;
 int numCubes = 0;
 
 std::vector<glm::vec3> transCubePosBuffer;

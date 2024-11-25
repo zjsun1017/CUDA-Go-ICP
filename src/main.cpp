@@ -9,7 +9,7 @@
 #include "window.h"
 
 #define CUDA_NAIVE 1
-#define CUDA_KDTREE	1
+#define CUDA_KDTREE	0
 
 /*
 *C main function.
