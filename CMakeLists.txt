@@ -53,6 +53,9 @@ include_directories(${GLM_INCLUDE_DIRS})
 file(GLOB headers
     src/*.h
     src/*.hpp
+    src/goicp/*.h
+    src/goicp/*.hpp
+
 )
 
 file(GLOB sources

@@ -22,6 +22,13 @@
 #include <vector>
 #include <algorithm>
 
+int mode = 0;
+#define ICP_CPU 0
+#define ICP_GPU	1
+#define ICP_KDTREE_GPU	2
+#define GOICP_CPU	3
+#define GOICP_GPU	4
+
 int numPoints = 0;
 int numDataPoints = 0;
 int numModelPoints = 0;

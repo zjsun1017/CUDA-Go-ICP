@@ -8,9 +8,6 @@
 #include "main.hpp"
 #include "window.h"
 
-#define CUDA_NAIVE 1
-#define CUDA_KDTREE	0
-
 /*
 *C main function.
 */
@@ -36,6 +33,7 @@ void initPointCloud(int argc, char** argv)
 	Config config(argv[1]);
 	load_cloud(config.io.source, config.subsample, dataBuffer);
 	load_cloud(config.io.target, config.subsample, modelBuffer);
+	mode = config.mode;
 
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
@@ -135,13 +133,31 @@ void initBufferAndkdTree()
 }
 
 void runCUDA() {
-#if CUDA_KDTREE
-	ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
-#elif CUDA_NAIVE
-	ICP::naiveGPUStep();
-#else
-	ICP::CPUStep(dataBuffer, modelBuffer);
-#endif
+	switch (mode) {
+	case ICP_CPU:
+		ICP::CPUStep(dataBuffer, modelBuffer);
+		break;
+
+	case ICP_GPU:
+		ICP::naiveGPUStep();
+		break;
+
+	case ICP_KDTREE_GPU:
+		ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
+		break;
+
+	case GOICP_CPU:
+		ICP::naiveGPUStep();
+		break;
+
+	case GOICP_GPU:
+		ICP::naiveGPUStep();
+		break;
+
+	default:
+		std::cerr << "Error: Invalid mode selected!" << std::endl;
+		break;
+	}
 }
 
 void mainLoop() {
@@ -169,7 +185,7 @@ void mainLoop() {
 		glfwSetWindowTitle(window, ss.str().c_str());
 
 		runCUDA();
-		drawMainWindow(); 
+		drawMainWindow();
 		drawSecondWindow();
 
 		glfwPollEvents();

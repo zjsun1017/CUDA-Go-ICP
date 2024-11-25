@@ -55,6 +55,7 @@ void Config::parse_toml(const std::string toml_filepath)
     if (tbl.contains("params"))
     {
         auto params_section = tbl["params"];
+        mode = params_section["mode"].value_or(1);
         trim = params_section["trim"].value_or(false);
         subsample = params_section["subsample"].value_or(1.0f);
         mse_threshold = params_section["mse_threshold"].value_or(1e-5f);

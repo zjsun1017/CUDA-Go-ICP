@@ -76,6 +76,7 @@ struct TransNode
 class Config
 {
 public:
+    int mode;
     bool trim;
     float subsample;
     float mse_threshold;
