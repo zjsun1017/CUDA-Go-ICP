@@ -8,11 +8,16 @@
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/scan.h>
 #include <thrust/reduce.h>
 #include <thrust/transform_reduce.h>
+#include <thrust/random.h>
+#include <thrust/copy.h>
+#include <thrust/remove.h>
+#include <thrust/execution_policy.h>
 
 #include "kdTree.hpp"
 

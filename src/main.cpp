@@ -8,9 +8,6 @@
 #include "main.hpp"
 #include "window.h"
 
-#define CUDA_NAIVE 1
-#define CUDA_KDTREE	0
-
 /*
 *C main function.
 */
@@ -36,11 +33,28 @@ void initPointCloud(int argc, char** argv)
 	Config config(argv[1]);
 	load_cloud(config.io.source, config.subsample, dataBuffer);
 	load_cloud(config.io.target, config.subsample, modelBuffer);
+	mode = config.mode;
 
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
 	numModelPoints = modelBuffer.size();
-	numPoints = dataBuffer.size() + modelBuffer.size();
+
+	if (mode == GOICP_CPU)
+	{
+		goicp.pModel = modelBuffer.data();
+		goicp.Nm = numModelPoints;
+		goicp.pData = dataBuffer.data();
+		goicp.Nd = numDataPoints;
+
+		// Build Distance Transform
+		Logger(LogLevel::Info) << "Building Distance Transform...";
+		goicp.BuildDT();
+		Logger(LogLevel::Info) << "Done!";
+
+		numPoints = 2 * numDataPoints + numModelPoints;
+	}
+	else 
+		numPoints = numDataPoints + numModelPoints;
 	Logger(LogLevel::Info) << "Total " << numPoints << " points loaded!";
 }
 
@@ -135,19 +149,44 @@ void initBufferAndkdTree()
 }
 
 void runCUDA() {
-#if CUDA_KDTREE
-	ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
-#elif CUDA_NAIVE
-	ICP::naiveGPUStep();
-#else
-	ICP::CPUStep(dataBuffer, modelBuffer);
-#endif
+	switch (mode) {
+	case ICP_CPU:
+		ICP::CPUStep(dataBuffer, modelBuffer);
+		break;
+
+	case ICP_GPU:
+		ICP::naiveGPUStep();
+		break;
+
+	case ICP_KDTREE_GPU:
+		ICP::kdTreeGPUStep(kdtree, tree, dev_fkdt);
+		break;
+
+	case GOICP_CPU:
+		ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
+		break;
+
+	case GOICP_GPU:
+		ICP::naiveGPUStep();
+		break;
+
+	default:
+		std::cerr << "Error: Invalid mode selected!" << std::endl;
+		break;
+	}
 }
 
 void mainLoop() {
 	double fps = 0;
 	double timebase = 0;
 	int frame = 0;
+
+	if (mode == GOICP_CPU)
+	{
+		std::thread register_thread(&GoICP::Register, &goicp);
+		register_thread.detach();
+	}
+		
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
@@ -169,7 +208,7 @@ void mainLoop() {
 		glfwSetWindowTitle(window, ss.str().c_str());
 
 		runCUDA();
-		drawMainWindow(); 
+		drawMainWindow();
 		drawSecondWindow();
 
 		glfwPollEvents();
