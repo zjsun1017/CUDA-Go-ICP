@@ -108,10 +108,13 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 		checkCUDAErrorWithLine("cudaMallocManaged dev_curDataBuffer failed!");
 	}
 
-	cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
+	if (mode == GOICP_GPU)
+	{
+		cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
+		cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
+	}
 
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
@@ -132,11 +135,14 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaDeviceSynchronize();
 
 	// Set search buffer
-	std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_cubePosBuffer);
-	std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
-	std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
-	std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
-	cudaDeviceSynchronize();
+	if (mode == GOICP_GPU)
+	{
+		std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_cubePosBuffer);
+		std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
+		std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
+		std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
+		cudaDeviceSynchronize();
+	}
 }
 
 void PointCloud::copyPointsToVBO(int N, glm::vec3* posBuffer, glm::vec3* colBuffer, float* vbodptr_positions, float* vbodptr_colors) {

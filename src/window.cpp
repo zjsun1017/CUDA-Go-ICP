@@ -348,6 +348,7 @@ void initCubeShaders(GLuint* program) {
 }
 
 bool initSecondWindow() {
+	if (mode != GOICP_GPU) return true;
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
@@ -380,6 +381,8 @@ bool initSecondWindow() {
 }
 
 void drawSecondWindow() {
+	if (mode != GOICP_GPU) return;
+
 	glfwMakeContextCurrent(secondWindow);
 	glUseProgram(program[PROG_CUBE]);
 	glBindVertexArray(cubeVAO);

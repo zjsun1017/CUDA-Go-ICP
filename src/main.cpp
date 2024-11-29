@@ -59,6 +59,8 @@ void initPointCloud(int argc, char** argv)
 }
 
 void initSearchSpace() {
+	if (mode != GOICP_GPU) return;
+
 	float initialSize = 1.0f;
 
 	transCubePosBuffer.push_back(glm::vec3(-1.0f, 0.0f, 0.0f));
