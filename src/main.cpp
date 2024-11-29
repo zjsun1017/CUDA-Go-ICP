@@ -38,7 +38,23 @@ void initPointCloud(int argc, char** argv)
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
 	numModelPoints = modelBuffer.size();
-	numPoints = dataBuffer.size() + modelBuffer.size();
+
+	if (mode == GOICP_CPU)
+	{
+		goicp.pModel = modelBuffer.data();
+		goicp.Nm = numModelPoints;
+		goicp.pData = dataBuffer.data();
+		goicp.Nd = numDataPoints;
+
+		// Build Distance Transform
+		Logger(LogLevel::Info) << "Building Distance Transform...";
+		goicp.BuildDT();
+		Logger(LogLevel::Info) << "Done!";
+
+		numPoints = 2 * numDataPoints + numModelPoints;
+	}
+	else 
+		numPoints = numDataPoints + numModelPoints;
 	Logger(LogLevel::Info) << "Total " << numPoints << " points loaded!";
 }
 
@@ -147,7 +163,7 @@ void runCUDA() {
 		break;
 
 	case GOICP_CPU:
-		ICP::naiveGPUStep();
+		ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
 		break;
 
 	case GOICP_GPU:
@@ -164,6 +180,13 @@ void mainLoop() {
 	double fps = 0;
 	double timebase = 0;
 	int frame = 0;
+
+	if (mode == GOICP_CPU)
+	{
+		std::thread register_thread(&GoICP::Register, &goicp);
+		register_thread.detach();
+	}
+		
 
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();

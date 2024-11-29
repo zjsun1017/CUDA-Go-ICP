@@ -240,6 +240,10 @@ float GoICP::InnerBnB(float* maxRotDisL, TRANSNODE* nodeTransOut)
 		nodeTransParent = queueTrans.top();
 		queueTrans.pop();
 
+		curT.val[0][0] = nodeTransParent.x,
+		curT.val[1][0] = nodeTransParent.y,
+		curT.val[2][0] = nodeTransParent.z;
+
 		if(optErrorT-nodeTransParent.lb < SSEThresh)
 		{
 			break;
@@ -456,6 +460,10 @@ float GoICP::OuterBnB()
 					pDataTemp[i].y = R21*p.x + R22*p.y + R23*p.z;
 					pDataTemp[i].z = R31*p.x + R32*p.y + R33*p.z;
 				}
+
+				curR.val[0][0] = R11; curR.val[0][1] = R12; curR.val[0][2] = R13;
+				curR.val[1][0] = R21; curR.val[1][1] = R22; curR.val[1][2] = R23;
+				curR.val[2][0] = R31; curR.val[2][1] = R32; curR.val[2][2] = R33;
 			}
 			// If t == 0, the rotation angle is 0 and no rotation is required
 			else

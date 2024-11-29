@@ -1,36 +1,34 @@
 #define GLM_FORCE_CUDA
 #include "kernel.h"
 
+extern int mode;
 extern int numPoints;
 extern int numDataPoints;
 extern int numModelPoints;
 
 extern glm::vec3* dev_pos;
 extern glm::vec3* dev_col;
-
 extern glm::vec3* dev_dataBuffer;
 extern glm::vec3* dev_modelBuffer;
 extern glm::vec3* dev_corrBuffer;
-
 extern glm::vec3* dev_centeredCorrBuffer;
 extern glm::vec3* dev_centeredDataBuffer;
 extern glm::mat3* dev_ABtBuffer;
+
+extern glm::vec3* dev_optDataBuffer;
+extern glm::vec3* dev_curDataBuffer;
 
 extern FlattenedKDTree* dev_fkdt;
 extern float* dev_minDists;
 extern size_t* dev_minIndices;
 
 extern int numCubes;
-
 extern std::vector<glm::vec3> transCubePosBuffer;
 extern std::vector<glm::vec3> transCubeColBuffer;
-
 extern std::vector<glm::vec3> rotCubePosBuffer;
 extern std::vector<glm::vec3> rotCubeColBuffer;
-
 extern glm::vec3* dev_cubePosBuffer;
 extern glm::vec3* dev_cubeColBuffer;
-
 extern glm::vec3* dev_rotCubePosBuffer;
 extern glm::vec3* dev_rotCubeColBuffer;
 
@@ -102,6 +100,14 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
+	if (mode == GOICP_CPU)
+	{
+		cudaMallocManaged((void**)&dev_optDataBuffer, numDataPoints * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_optDataBuffer failed!");
+		cudaMallocManaged((void**)&dev_curDataBuffer, numDataPoints * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_curDataBuffer failed!");
+	}
+
 	cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
 	cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
@@ -112,6 +118,8 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_modelBuffer);
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_pos);
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints);
+	if (mode == GOICP_CPU) 
+		std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints + numDataPoints);
 
 	// Set color buffer
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
@@ -119,6 +127,8 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
+	if (mode == GOICP_CPU) 
+		kernResetVec3Buffer <<< dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints + numDataPoints], glm::vec3(1.0));
 	cudaDeviceSynchronize();
 
 	// Set search buffer
@@ -126,7 +136,6 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
 	std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
 	std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
-
 	cudaDeviceSynchronize();
 }
 
@@ -152,6 +161,11 @@ void PointCloud::cleanupBuffers() {
 	cudaFree(dev_minIndices);
 	cudaFree(dev_cubePosBuffer);
 	cudaFree(dev_cubeColBuffer);
+	if (mode == GOICP_CPU)
+	{
+		cudaFree(dev_optDataBuffer);
+		cudaFree(dev_curDataBuffer);
+	}
 	checkCUDAErrorWithLine("cudaFree failed!");
 }
 

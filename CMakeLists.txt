@@ -61,6 +61,8 @@ file(GLOB headers
 file(GLOB sources
     src/*.cpp
     src/*.cu
+    src/goicp/*.cpp
+
 )
 
 list(SORT headers)

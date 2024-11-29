@@ -1,6 +1,12 @@
 # pragma once
 #include "kernel.h"
 
+#define ICP_CPU 0
+#define ICP_GPU	1
+#define ICP_KDTREE_GPU	2
+#define GOICP_CPU	3
+#define GOICP_GPU	4
+
 inline int ilog2(int x) {
     int lg = 0;
     while (x >>= 1) {

@@ -50,7 +50,7 @@
 # endif
 #endif
 
-namespace nanoflann
+namespace nanoflann_goicp
 {
 /** @addtogroup nanoflann_grp nanoflann C++ library for ANN
   *  @{ */
@@ -264,10 +264,10 @@ namespace nanoflann
 
 			/* Process 4 items with each loop for efficiency. */
 			while (a < lastgroup) {
-				const DistanceType diff0 = nanoflann::abs(a[0] - data_source.kdtree_get_pt(b_idx,d++));
-				const DistanceType diff1 = nanoflann::abs(a[1] - data_source.kdtree_get_pt(b_idx,d++));
-				const DistanceType diff2 = nanoflann::abs(a[2] - data_source.kdtree_get_pt(b_idx,d++));
-				const DistanceType diff3 = nanoflann::abs(a[3] - data_source.kdtree_get_pt(b_idx,d++));
+				const DistanceType diff0 = nanoflann_goicp::abs(a[0] - data_source.kdtree_get_pt(b_idx,d++));
+				const DistanceType diff1 = nanoflann_goicp::abs(a[1] - data_source.kdtree_get_pt(b_idx,d++));
+				const DistanceType diff2 = nanoflann_goicp::abs(a[2] - data_source.kdtree_get_pt(b_idx,d++));
+				const DistanceType diff3 = nanoflann_goicp::abs(a[3] - data_source.kdtree_get_pt(b_idx,d++));
 				result += diff0 + diff1 + diff2 + diff3;
 				a += 4;
 				if ((worst_dist>0)&&(result>worst_dist)) {
@@ -276,7 +276,7 @@ namespace nanoflann
 			}
 			/* Process last 0-3 components.  Not needed for standard vector lengths. */
 			while (a < last) {
-				result += nanoflann::abs( *a++ - data_source.kdtree_get_pt(b_idx,d++) );
+				result += nanoflann_goicp::abs( *a++ - data_source.kdtree_get_pt(b_idx,d++) );
 			}
 			return result;
 		}
@@ -284,7 +284,7 @@ namespace nanoflann
 		template <typename U, typename V>
 		inline DistanceType accum_dist(const U a, const V b, int ) const
 		{
-			return nanoflann::abs(a-b);
+			return nanoflann_goicp::abs(a-b);
 		}
 	};
 
@@ -804,7 +804,7 @@ namespace nanoflann
 		void findNeighbors(RESULTSET& result, const ElementType* vec, const SearchParams& searchParams) const
 		{
 			assert(vec);
-			if (!root_node) throw std::runtime_error("[nanoflann] findNeighbors() called before building the index.");
+			if (!root_node) throw std::runtime_error("[nanoflann_goicp] findNeighbors() called before building the index.");
 			float epsError = 1+searchParams.eps;
 
 			std::vector<DistanceType> dists( (DIM>0 ? DIM : dim) ,0);
@@ -820,9 +820,9 @@ namespace nanoflann
 		 */
 		inline void knnSearch(const ElementType *query_point, const size_t num_closest, IndexType *out_indices, DistanceType *out_distances_sq, const int nChecks_IGNORED = 10) const
 		{
-			nanoflann::KNNResultSet<DistanceType,IndexType> resultSet(num_closest);
+			nanoflann_goicp::KNNResultSet<DistanceType,IndexType> resultSet(num_closest);
 			resultSet.init(out_indices, out_distances_sq);
-			this->findNeighbors(resultSet, query_point, nanoflann::SearchParams());
+			this->findNeighbors(resultSet, query_point, nanoflann_goicp::SearchParams());
 		}
 
 		/**
@@ -1234,7 +1234,7 @@ namespace nanoflann
 	  *  \tparam Distance The distance metric to use: nanoflann::metric_L1, nanoflann::metric_L2, nanoflann::metric_L2_Simple, etc.
 	  *  \tparam IndexType The type for indices in the KD-tree index (typically, size_t of int)
 	  */
-	template <class MatrixType, int DIM = -1, class Distance = nanoflann::metric_L2, typename IndexType = size_t>
+	template <class MatrixType, int DIM = -1, class Distance = nanoflann_goicp::metric_L2, typename IndexType = size_t>
 	struct KDTreeEigenMatrixAdaptor
 	{
 		typedef KDTreeEigenMatrixAdaptor<MatrixType,DIM,Distance,IndexType> self_t;
@@ -1250,7 +1250,7 @@ namespace nanoflann
 			const size_t dims = mat.cols();
 			if (DIM>0 && static_cast<int>(dims)!=DIM)
 				throw std::runtime_error("Data set dimensionality does not match the 'DIM' template argument");
-			index = new index_t( dims, *this /* adaptor */, nanoflann::KDTreeSingleIndexAdaptorParams(leaf_max_size, dims ) );
+			index = new index_t( dims, *this /* adaptor */, nanoflann_goicp::KDTreeSingleIndexAdaptorParams(leaf_max_size, dims ) );
 			index->buildIndex();
 		}
 
@@ -1267,9 +1267,9 @@ namespace nanoflann
 		  */
 		inline void query(const num_t *query_point, const size_t num_closest, IndexType *out_indices, num_t *out_distances_sq, const int nChecks_IGNORED = 10) const
 		{
-			nanoflann::KNNResultSet<typename MatrixType::Scalar,IndexType> resultSet(num_closest);
+			nanoflann_goicp::KNNResultSet<typename MatrixType::Scalar,IndexType> resultSet(num_closest);
 			resultSet.init(out_indices, out_distances_sq);
-			index->findNeighbors(resultSet, query_point, nanoflann::SearchParams());
+			index->findNeighbors(resultSet, query_point, nanoflann_goicp::SearchParams());
 		}
 
 		/** @name Interface expected by KDTreeSingleIndexAdaptor

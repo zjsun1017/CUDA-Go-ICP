@@ -3,6 +3,7 @@
 //====================================
 // GL Stuff for Main Window
 //====================================
+extern int mode;
 
 GLuint positionLocation = 0;   // Match results from glslUtility::createProgram.
 GLuint colorsLocation = 1; // Also see attribtueLocations below.
@@ -33,8 +34,8 @@ double lastX;
 double lastY;
 float theta = 0.4f;
 float phi = 0.0f;
-float zoom = 0.1f;
-glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.1f);
+float zoom = 5.0f;
+glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 cameraPosition;
 glm::mat4 projection;
 

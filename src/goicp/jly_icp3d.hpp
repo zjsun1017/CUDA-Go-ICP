@@ -26,8 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define JLY_ICP3D_HPP
 
 #include "matrix.h"
-#include "nanoflann.hpp"
-using namespace nanoflann;
+#include "nanoflann_goicp.hpp"
+using namespace nanoflann_goicp;
 
 
 // A custom data set class to use nanoflann
