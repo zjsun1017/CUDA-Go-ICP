@@ -11,6 +11,7 @@ extern glm::vec3* dev_dataBuffer;
 extern glm::vec3* dev_optDataBuffer;
 extern glm::vec3* dev_curDataBuffer;
 
+extern std::priority_queue<RotNode> rcandidates;
 extern float bestSSE;
 extern glm::mat3 bestR;
 extern glm::vec3 bestT;
@@ -246,5 +247,78 @@ ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot, StreamPool& stream
     Logger() << count << " TransNodes searched. Inner BnB finished";
 
     return { best_error, best_t };
+}
+
+// Get the top rotation node from the priority queue
+bool getNextRotationNode(RotNode& currentNode) {
+    if (rcandidates.empty()) return false;
+
+    currentNode = rcandidates.top();
+    rcandidates.pop();
+
+    // Stop if no further improvement is possible
+    if (bestSSE - currentNode.lb <= sse_threshold) {
+        return false;
+    }
+
+    return true;
+}
+
+// Process the current rotation node and spawn children
+void processRotationNode(RotNode& rnode, StreamPool& stream_pool) {
+    float span = rnode.span / 2.0f;
+
+    for (char j = 0; j < 8; ++j) {
+        if (span < 0.02f) { continue; }
+        RotNode child_rnode(
+            rnode.q.x - span + (j >> 0 & 1) * rnode.span,
+            rnode.q.y - span + (j >> 1 & 1) * rnode.span,
+            rnode.q.z - span + (j >> 2 & 1) * rnode.span,
+            span, rnode.lb, rnode.ub
+        );
+
+        if (!child_rnode.overlaps_SO3()) { continue; }
+        if (!child_rnode.q.in_SO3()) {
+            rcandidates.push(std::move(child_rnode));
+            continue;
+        }
+
+        // Compute bounds for translation (R3 space)
+        auto [ub, best_t] = branch_and_bound_R3(child_rnode, true, stream_pool);
+
+        if (ub < bestSSE) {
+            auto [icp_sse, icp_R, icp_t] = computeICP(child_rnode.q.R, best_t);
+
+            if (icp_sse < ub) {
+                bestSSE = icp_sse;
+                bestR = icp_R;
+                bestT = icp_t;
+            }
+            else {
+                bestSSE = ub;
+                bestR = child_rnode.q.R;
+                bestT = best_t;
+            }
+        }
+
+        auto [lb, _] = branch_and_bound_R3(child_rnode, false, stream_pool);
+
+        if (lb >= bestSSE) { continue; }
+        child_rnode.lb = lb;
+        child_rnode.ub = ub;
+
+        rcandidates.push(std::move(child_rnode));
+    }
+}
+
+// Single step of branch and bound SO3
+bool ICP::branchAndBoundSO3Step(StreamPool& stream_pool) {
+    RotNode currentNode(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, bestSSE);
+    if (!getNextRotationNode(currentNode)) {
+        return false; // Termination condition
+    }
+
+    processRotationNode(currentNode, stream_pool);
+    return true;
 }
 
