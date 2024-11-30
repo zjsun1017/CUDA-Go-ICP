@@ -2,43 +2,14 @@
 #include "goicp/jly_goicp.h"
 #include <mutex>
 
-using BoundsResult_t = std::tuple<std::vector<float>, std::vector<float>>;
+using ResultBnBR3 = std::tuple<float, glm::vec3>;
 
 namespace ICP {
 	void goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx);
 	void goicpGPUStep();
 }
 
-//========================================================================================
-    //                                    CUDA Stream Pool
-    //========================================================================================
-class StreamPool
-{
-public:
-    explicit StreamPool(size_t size) : streams(size)
-    {
-        for (auto& stream : streams)
-        {
-            cudaStreamCreate(&stream);
-        }
-    }
+float branch_and_bound_SO3();
+ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot);
 
-    ~StreamPool()
-    {
-        for (auto& stream : streams)
-        {
-            cudaStreamDestroy(stream);
-        }
-    }
 
-    cudaStream_t getStream(size_t index) const
-    {
-        return streams[index % streams.size()];
-    }
-
-private:
-    std::vector<cudaStream_t> streams;
-};
-
-float compute_sse_error(glm::mat3 R, glm::vec3 t);
-BoundsResult_t compute_sse_error(RotNode& rnode, std::vector<TransNode>& tnodes, bool fix_rot, StreamPool& stream_pool);

@@ -19,6 +19,7 @@
 #include <thrust/remove.h>
 #include <thrust/execution_policy.h>
 
+#include "common.h"
 #include "kdTree.hpp"
 
 #define blockSize 512

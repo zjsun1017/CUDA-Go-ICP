@@ -193,8 +193,6 @@ void PointCloud::cleanupBuffers() {
 		cudaFree(dev_cubeColBuffer);
 	}
 
-
-
 	checkCUDAErrorWithLine("cudaFree failed!");
 }
 

@@ -1,6 +1,5 @@
 #define GLM_FORCE_CUDA
 #include "icp_kernel.h"
-#include "goicp_kernel.h"
 #include "svd3.h"
 #include <device_atomic_functions.h>
 #include <cuda_runtime.h>
@@ -29,6 +28,10 @@ extern std::vector<float> sse_rot_ub_trans_ub;
 extern std::vector<float> sse_rot_ub_trans_lb;
 extern float* dev_rot_ub_trans_ub;
 extern float* dev_rot_ub_trans_lb;
+
+extern float bestSSE;
+extern glm::mat3 bestR;
+extern glm::vec3 bestT;
 
 //Helper functions
 void matSVD(glm::mat3& ABt, glm::mat3& U, glm::mat3& S, glm::mat3& V)
@@ -202,7 +205,7 @@ void ICP::naiveGPUStep() {
 	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
 	cudaDeviceSynchronize();
 
-	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
 
 	//compute SVD of ABt
 	glm::mat3 R(0.0f), U(0.0f), S(0.0f), V(0.0f);
@@ -284,48 +287,41 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree
 	cudaDeviceSynchronize();
 }
 
-__global__ void kernFindNearestNeighbor(int N, glm::mat3 R, glm::vec3 t, const glm::vec3* dev_pcs, const FlattenedKDTree* d_fkdt, Correspondence* dev_corrs)
+Result_t computeICP(glm::mat3 R, glm::vec3 T)
 {
-	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (index >= N) { return; }
+	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+	// Find nearest correspondences
+	kernSearchNearest << <dataBlocksPerGrid, blockSize >> > (numDataPoints, numModelPoints, dev_dataBuffer, dev_modelBuffer, dev_corrBuffer);
+	cudaDeviceSynchronize();
 
-	glm::vec3 query_point = R * dev_pcs[index] + t;
+	// Centralize
+	glm::vec3 meanData = thrust::reduce(thrust::device, dev_dataBuffer, dev_dataBuffer + numDataPoints);
+	glm::vec3 meanCorr = thrust::reduce(thrust::device, dev_corrBuffer, dev_corrBuffer + numDataPoints);
+	meanData = meanData / static_cast<float>(numDataPoints);
+	meanCorr = meanCorr / static_cast<float>(numDataPoints);
 
-	size_t nearest_index = 0;
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_centeredDataBuffer, meanData);
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_corrBuffer, dev_centeredCorrBuffer, meanCorr);
+	cudaDeviceSynchronize();
 
-	float distance_squared = 1e+10f;
-	d_fkdt->find_nearest_neighbor(query_point, distance_squared, nearest_index);
+	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
+	cudaDeviceSynchronize();
 
-	dev_corrs[index].dist_squared = distance_squared;
-	dev_corrs[index].idx_s = index;
-	dev_corrs[index].idx_t = nearest_index;
-	dev_corrs[index].ps_transformed = query_point;
+	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 R_(0.0f), U(0.0f), S(0.0f), V(0.0f);
+	glm::vec3 T_(0.0f);
+
+	matSVD(ABt, U, S, V);
+
+	R_ = glm::transpose(U) * V; // Strange glm::mat column sequence >:(
+	T_ = meanCorr - (R * meanData);
+
+	auto R_new = R_ * R;
+	auto T_new = R_ * T + T_;
+	float SSE = compute_sse_error(R_new, T_new);
+
+	return { SSE, R_new, T_new };
 }
-
-__global__ void kernSetRegistrationMatrices(int N, Rotation q, glm::vec3 t, const glm::vec3* dev_pcs, const glm::vec3* dev_pct, const Correspondence* dev_corrs, float* dev_mat_pcs, float* dev_mat_pct)
-{
-	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if (index >= N) { return; }
-
-	Correspondence corr = dev_corrs[index];
-	glm::vec3 pt = dev_pct[corr.idx_t];
-	glm::vec3 ps = corr.ps_transformed;
-
-	size_t mat_idx = index * 3;
-
-	dev_mat_pct[mat_idx] = pt.x;
-	dev_mat_pct[mat_idx + 1] = pt.y;
-	dev_mat_pct[mat_idx + 2] = pt.z;
-
-	dev_mat_pcs[mat_idx] = ps.x;
-	dev_mat_pcs[mat_idx + 1] = ps.y;
-	dev_mat_pcs[mat_idx + 2] = ps.z;
-}
-
-
-//============================================
-//            Flattened k-d tree
-//============================================
 
 FlattenedKDTree::FlattenedKDTree(const KDTree& kdt, const std::vector<glm::vec3>& pct) {
 	// Transfer point cloud and KDTree accumulator to device
@@ -484,7 +480,7 @@ float compute_sse_error(glm::mat3 R, glm::vec3 t)
 	kernComputeClosestError << <dataBlocksPerGrid, blockSize >> > (numDataPoints, R, t, dev_dataBuffer, dev_fkdt, dev_errors);
 	cudaDeviceSynchronize();
 
-	float sse_error = thrust::reduce(thrust::device, dev_errors, dev_errors + numDataPoints);
+	float sse_error = thrust::reduce(dev_errors, dev_errors + numDataPoints);
 	return sse_error;
 }
 

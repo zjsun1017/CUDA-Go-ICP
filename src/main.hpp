@@ -77,6 +77,12 @@ int currTNodes = 0;
 float* dev_errors;
 float* dev_rot_ub_trans_ub;
 float* dev_rot_ub_trans_lb;
+StreamPool stream_pool(32);
+
+float bestSSE = FLT_MAX;
+glm::mat3 bestR(0.0f);
+glm::vec3 bestT(0.0f); 
+float sse_threshold;
 
 // Window settings
 std::string deviceName;

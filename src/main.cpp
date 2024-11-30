@@ -38,6 +38,7 @@ void initPointCloud(int argc, char** argv)
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
 	numModelPoints = modelBuffer.size();
+	sse_threshold = config.mse_threshold * numDataPoints;
 
 	if (mode == GOICP_CPU)
 	{

@@ -32,16 +32,19 @@ struct Correspondence
 
 struct Rotation
 {
-    float rr, x, y, z;
+    float x, y, z, r;
     glm::mat3 R;
 
-    Rotation(float x, float y, float z) :
-        x(x), y(y), z(z)
-    {
-        rr = x * x + y * y + z * z;
-        if (rr > 1.0f) { return; } // Not a rotation
+    Rotation() : Rotation(0.0f, 0.0f, 0.0f) {}
 
-        float ww = 1.0f - rr;
+    Rotation(float x, float y, float z) :
+        x(x), y(y), z(z),
+        r(x* x + y * y + z * z),
+        R(1.0f)
+    {
+        if (r > 1.0f) { return; } // Not a rotation
+
+        float ww = 1.0f - r;
         float w = sqrt(ww);
         float wx = w * x, xx = x * x;
         float wy = w * y, xy = x * y, yy = y * y;
@@ -52,24 +55,56 @@ struct Rotation
             2 * (xy + wz), ww - xx + yy - zz, 2 * (yz - wx),
             2 * (xz - wy), 2 * (yz + wx), ww - xx - yy + zz
         );
+
+        r = sqrt(r);
     }
+
+    Rotation(const Rotation& other) :
+        r(other.r), x(other.x), y(other.y), z(other.z), R(other.R)
+    {}
+
+    /**
+     * @brief Validate that the Rotation is in SO(3)
+     *
+     * @return true if valid; false if not
+     */
+    bool in_SO3() const { return r <= 1.0f; }
 };
 
 /**
-     * @brief Rotation Node in the bounding box where SO(3) resides in.
-     * 
-     */
-    struct RotNode
-    {
-        Rotation q;  // Coordinate in the bounding box
-        float span;     // Span of the node
-        float ub, lb;   // upper and lower error bound of this node
+ * @brief Rotation Node in the bounding box where SO(3) resides in.
+ *
+ */
+struct RotNode
+{
+    Rotation q;     // Coordinate in the bounding box
+    float span;     // half edge length of the bounding cube of a rotation node
+    float lb, ub;   // upper and lower error bound of this node
 
-        bool is_valid()
+    RotNode(float x, float y, float z, float span, float lb, float ub) :
+        q(x, y, z), span(span), lb(lb), ub(ub)
+    {}
+
+    friend bool operator<(const RotNode& rnode1, const RotNode& rnode2)
+    {
+        if (rnode1.lb == rnode2.lb)
         {
-            return q.rr <= 1.0f;
+            return rnode1.span < rnode2.span;
         }
-    };
+        return rnode1.lb > rnode2.lb;
+    }
+
+    /**
+     * @brief Validate that the Rotation Node is (partially) in SO(3)
+     *
+     * @return true if valid; false if not
+     */
+    bool overlaps_SO3() const
+    {
+        // (|x|-s)^2 + (|y|-s)^2 + (|y|-s)^2 <= 1
+        return q.r - 2 * span * (abs(q.x) + abs(q.y) + abs(q.z)) + 3 * span * span <= 1;
+    }
+};
 
 /**
  * @brief Translation Node in the R(3) space.
@@ -79,7 +114,20 @@ struct TransNode
 {
     glm::vec3 t;
     float span;
-    float ub, lb;
+    float lb, ub;
+
+    TransNode(float x, float y, float z, float span, float lb, float ub) :
+        t(x, y, z), span(span), lb(lb), ub(ub)
+    {}
+
+    friend bool operator<(const TransNode& tnode1, const TransNode& tnode2)
+    {
+        if (tnode1.lb == tnode2.lb)
+        {
+            return tnode1.span < tnode2.span;
+        }
+        return tnode1.lb > tnode2.lb;
+    }
 };
 
 class Config
@@ -135,12 +183,31 @@ class Logger
 {
 public:
     explicit Logger(LogLevel level) : level_(level) {}
+    Logger() : Logger(LogLevel::Debug) {}
 
     // Overload << operator for streaming
     template <typename T>
     Logger& operator<<(const T& msg)
     {
         buffer_ << msg; // Stream the message into the buffer
+        return *this;
+    }
+
+    // Overload << for glm::vec3
+    Logger& operator<<(const glm::vec3& vec)
+    {
+        buffer_ << std::fixed << std::setprecision(6);
+        buffer_ << vec.x << "\t" << vec.y << "\t" << vec.z;
+        return *this;
+    }
+
+    // Overload << for glm::mat3
+    Logger& operator<<(const glm::mat3& mat)
+    {
+        buffer_ << std::fixed << std::setprecision(4);
+        buffer_ << "\t" << mat[0][0] << "\t" << mat[1][0] << "\t" << mat[2][0] << "\n";
+        buffer_ << "\t" << mat[0][1] << "\t" << mat[1][1] << "\t" << mat[2][1] << "\n";
+        buffer_ << "\t" << mat[0][2] << "\t" << mat[1][2] << "\t" << mat[2][2];
         return *this;
     }
 
@@ -191,3 +258,32 @@ private:
         return ss.str();
     }
 };
+
+class StreamPool
+{
+public:
+    explicit StreamPool(size_t size) : streams(size)
+    {
+        for (auto& stream : streams)
+        {
+            cudaStreamCreate(&stream);
+        }
+    }
+
+    ~StreamPool()
+    {
+        for (auto& stream : streams)
+        {
+            cudaStreamDestroy(stream);
+        }
+    }
+
+    cudaStream_t getStream(size_t index) const
+    {
+        return streams[index % streams.size()];
+    }
+
+private:
+    std::vector<cudaStream_t> streams;
+};
+
