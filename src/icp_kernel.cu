@@ -1,5 +1,6 @@
 #define GLM_FORCE_CUDA
 #include "icp_kernel.h"
+#include "goicp_kernel.h"
 #include "svd3.h"
 #include <device_atomic_functions.h>
 #include <cuda_runtime.h>
@@ -22,6 +23,12 @@ extern glm::mat3* dev_ABtBuffer;
 extern FlattenedKDTree* dev_fkdt;
 extern float* dev_minDists;
 extern size_t* dev_minIndices;
+
+extern float* dev_errors;
+extern std::vector<float> sse_rot_ub_trans_ub;
+extern std::vector<float> sse_rot_ub_trans_lb;
+extern float* dev_rot_ub_trans_ub;
+extern float* dev_rot_ub_trans_lb;
 
 //Helper functions
 void matSVD(glm::mat3& ABt, glm::mat3& U, glm::mat3& S, glm::mat3& V)
@@ -180,8 +187,8 @@ void ICP::naiveGPUStep() {
 	cudaDeviceSynchronize();
 
 	// Centralize
-	glm::vec3 meanData = thrust::reduce(dev_dataBuffer, dev_dataBuffer + numDataPoints);
-	glm::vec3 meanCorr = thrust::reduce(dev_corrBuffer, dev_corrBuffer + numDataPoints);
+	glm::vec3 meanData = thrust::reduce(thrust::device, dev_dataBuffer, dev_dataBuffer + numDataPoints);
+	glm::vec3 meanCorr = thrust::reduce(thrust::device, dev_corrBuffer, dev_corrBuffer + numDataPoints);
 	meanData = meanData / static_cast<float>(numDataPoints);
 	meanCorr = meanCorr / static_cast<float>(numDataPoints);
 
@@ -243,8 +250,8 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree
 	//cudaDeviceSynchronize();
 
 	// Centralize
-	glm::vec3 meanData = thrust::reduce(dev_dataBuffer, dev_dataBuffer + numDataPoints);
-	glm::vec3 meanCorr = thrust::reduce(dev_corrBuffer, dev_corrBuffer + numDataPoints);
+	glm::vec3 meanData = thrust::reduce(thrust::device, dev_dataBuffer, dev_dataBuffer + numDataPoints);
+	glm::vec3 meanCorr = thrust::reduce(thrust::device, dev_corrBuffer, dev_corrBuffer + numDataPoints);
 	meanData = meanData / static_cast<float>(numDataPoints);
 	meanCorr = meanCorr / static_cast<float>(numDataPoints);
 
@@ -258,7 +265,7 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree
 	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
 	cudaDeviceSynchronize();
 
-	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
 
 	//compute SVD of ABt
 	glm::mat3 R(0.0f), U(0.0f), S(0.0f), V(0.0f);
@@ -416,4 +423,99 @@ __device__ void FlattenedKDTree::find_nearest_neighbor(const glm::vec3 query, fl
 			}
 		}
 	}
+}
+
+__global__ void kernComputeClosestError(int N, glm::mat3 R, glm::vec3 t, const glm::vec3* dataBuffer, const FlattenedKDTree* d_fkdt, float* d_errors)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N) { return; }
+
+	glm::vec3 source_point = dataBuffer[index];
+	glm::vec3 query_point = R * source_point + t;
+
+	size_t nearest_index = 0;
+	float distance_squared = FLT_MAX;
+	d_fkdt->find_nearest_neighbor(query_point, distance_squared, nearest_index);
+
+	d_errors[index] = distance_squared;
+}
+
+__global__ void kernComputeBounds(int N, RotNode rnode, TransNode tnode, bool fix_rot, const glm::vec3* dev_dataBuffer, const FlattenedKDTree* d_fkdt, float* dev_rot_ub_trans_ub, float* dev_rot_ub_trans_lb)
+{
+	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if (index >= N) { return; }
+
+	glm::vec3 source_point = dev_dataBuffer[index];
+	float trans_uncertain_radius = M_SQRT3 * tnode.span;
+	glm::vec3 query_point = rnode.q.R * source_point + tnode.t;
+
+	float rot_uncertain_radius;
+	if (!fix_rot)
+	{
+		float radius = source_point.x * source_point.x +
+			source_point.y * source_point.y +
+			source_point.z * source_point.z;
+		float half_angle = rnode.span * M_SQRT3 * M_PI / 2.0f;  // TODO: Need examination, since we are using quaternions
+		rot_uncertain_radius = 2.0f * radius * sin(half_angle);
+	}
+
+	size_t nearest_index = 0;
+	float distance_squared = FLT_MAX;
+	d_fkdt->find_nearest_neighbor(query_point, distance_squared, nearest_index);
+
+	float distance = sqrt(distance_squared);
+	if (!fix_rot)
+	{
+		distance -= rot_uncertain_radius;
+	}
+
+	dev_rot_ub_trans_ub[index] = distance > 0.0f ? distance * distance : 0.0f;
+
+
+	float rot_ub_trans_lb = distance - trans_uncertain_radius;
+	rot_ub_trans_lb = rot_ub_trans_lb > 0.0f ? rot_ub_trans_lb * rot_ub_trans_lb : 0.0f;
+	dev_rot_ub_trans_lb[index] = rot_ub_trans_lb;
+}
+
+float compute_sse_error(glm::mat3 R, glm::vec3 t)
+{
+	size_t block_size = 32;
+	dim3 dataBlocksPerGrid((numDataPoints + block_size - 1) / block_size);
+	kernComputeClosestError << <dataBlocksPerGrid, blockSize >> > (numDataPoints, R, t, dev_dataBuffer, dev_fkdt, dev_errors);
+	cudaDeviceSynchronize();
+
+	float sse_error = thrust::reduce(thrust::device, dev_errors, dev_errors + numDataPoints);
+	return sse_error;
+}
+
+BoundsResult_t compute_sse_error(RotNode& rnode, std::vector<TransNode>& tnodes, bool fix_rot, StreamPool& stream_pool)
+{
+	size_t num_transforms = tnodes.size();
+	std::vector<float> sse_rot_ub_trans_ub(num_transforms);
+	std::vector<float> sse_rot_ub_trans_lb(num_transforms);
+
+	// Kernel launching parameters
+	size_t block_size = 32;
+	dim3 dataBlocksPerGrid((numDataPoints + block_size - 1) / block_size);
+
+	// Launch kernel for each (R, t) pair on separate streams
+	for (size_t i = 0; i < num_transforms; ++i) {
+		// Get the appropriate stream from the stream pool
+		cudaStream_t stream = stream_pool.getStream(i);
+
+		// Launch the kernel with each (R, t) on a different stream
+		kernComputeBounds << <dataBlocksPerGrid, block_size, 0, stream >> > (
+			numDataPoints, rnode, tnodes[i], fix_rot, dev_dataBuffer, dev_fkdt, dev_rot_ub_trans_ub + i * numDataPoints, dev_rot_ub_trans_lb + i * numDataPoints);
+	}
+
+	// Reduce the lower/upper bounds for each pair
+	for (size_t i = 0; i < num_transforms; ++i) {
+		// Thrust reduce launching parameters
+		auto thrust_policy = thrust::cuda::par.on(stream_pool.getStream(i));
+		sse_rot_ub_trans_ub[i] = thrust::reduce(thrust_policy, dev_rot_ub_trans_ub + i * numDataPoints, dev_rot_ub_trans_ub + (i + 1) * numDataPoints);
+		sse_rot_ub_trans_lb[i] = thrust::reduce(thrust_policy, dev_rot_ub_trans_ub + i * numDataPoints, dev_rot_ub_trans_ub + (i + 1) * numDataPoints);
+	}
+
+	cudaDeviceSynchronize();
+	return { sse_rot_ub_trans_lb, sse_rot_ub_trans_ub };
 }

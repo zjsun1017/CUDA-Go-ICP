@@ -1,6 +1,9 @@
 # pragma once
 #include "kernel.h"
 
+#define M_PI    3.141592653589793f
+#define M_SQRT3 1.732050807568877f
+
 #define ICP_CPU 0
 #define ICP_GPU	1
 #define ICP_KDTREE_GPU	2

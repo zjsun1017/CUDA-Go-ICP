@@ -70,6 +70,14 @@ std::mutex mtx;
 glm::vec3* dev_optDataBuffer;
 glm::vec3* dev_curDataBuffer;
 
+
+// GOICP on GPU setup
+int maxTNodes = 16;
+int currTNodes = 0;
+float* dev_errors;
+float* dev_rot_ub_trans_ub;
+float* dev_rot_ub_trans_lb;
+
 // Window settings
 std::string deviceName;
 GLFWwindow* window;

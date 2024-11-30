@@ -13,7 +13,7 @@ output = "output.toml"                      # output file: R, t, MSE
 visualization = "viz.ply"                   # visualization ply file, set to "" to skip
 
 [params]
-mode = 3                                    # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
+mode = 4                                  # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
 trim = true                                 # perform trimming
 subsample = 0.05                             # subsample the source point cloud
 mse_threshold = 1e-5                        # MSE threshold for convergence

@@ -76,3 +76,7 @@ void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT,
 		numPoints = numDataPoints + numModelPoints;
 	}
 }
+
+
+
+
