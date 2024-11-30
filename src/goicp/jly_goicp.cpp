@@ -205,10 +205,10 @@ void GoICP::Clear()
 	delete(pDataTempICP);
 	delete(normData);
 	delete(minDis);
-	for(int i = 0; i < MAXROTLEVEL; i++)
-	{
-		delete(maxRotDis[i]);
-	}
+	//for(int i = 0; i < MAXROTLEVEL; i++)
+	//{
+	//	delete(maxRotDis[i]);
+	//}
 	delete(maxRotDis);
 	delete(M_icp);
 	delete(D_icp);
