@@ -24,8 +24,6 @@ extern float* dev_minDists;
 extern size_t* dev_minIndices;
 
 extern float* dev_errors;
-extern std::vector<float> sse_rot_ub_trans_ub;
-extern std::vector<float> sse_rot_ub_trans_lb;
 extern float* dev_rot_ub_trans_ub;
 extern float* dev_rot_ub_trans_lb;
 
@@ -205,7 +203,7 @@ void ICP::naiveGPUStep() {
 	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
 	cudaDeviceSynchronize();
 
-	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
 
 	//compute SVD of ABt
 	glm::mat3 R(0.0f), U(0.0f), S(0.0f), V(0.0f);
@@ -268,7 +266,7 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree
 	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
 	cudaDeviceSynchronize();
 
-	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
 
 	//compute SVD of ABt
 	glm::mat3 R(0.0f), U(0.0f), S(0.0f), V(0.0f);
@@ -285,42 +283,6 @@ void ICP::kdTreeGPUStep(KDTree& kdTree, PointCloudAdaptor& tree, FlattenedKDTree
 
 	std::copy(&dev_dataBuffer[0], &dev_dataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
 	cudaDeviceSynchronize();
-}
-
-Result_t computeICP(glm::mat3 R, glm::vec3 T)
-{
-	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
-	// Find nearest correspondences
-	kernSearchNearest << <dataBlocksPerGrid, blockSize >> > (numDataPoints, numModelPoints, dev_dataBuffer, dev_modelBuffer, dev_corrBuffer);
-	cudaDeviceSynchronize();
-
-	// Centralize
-	glm::vec3 meanData = thrust::reduce(thrust::device, dev_dataBuffer, dev_dataBuffer + numDataPoints);
-	glm::vec3 meanCorr = thrust::reduce(thrust::device, dev_corrBuffer, dev_corrBuffer + numDataPoints);
-	meanData = meanData / static_cast<float>(numDataPoints);
-	meanCorr = meanCorr / static_cast<float>(numDataPoints);
-
-	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_centeredDataBuffer, meanData);
-	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_corrBuffer, dev_centeredCorrBuffer, meanCorr);
-	cudaDeviceSynchronize();
-
-	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
-	cudaDeviceSynchronize();
-
-	glm::mat3 ABt = thrust::reduce(thrust::device, dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
-	glm::mat3 R_(0.0f), U(0.0f), S(0.0f), V(0.0f);
-	glm::vec3 T_(0.0f);
-
-	matSVD(ABt, U, S, V);
-
-	R_ = glm::transpose(U) * V; // Strange glm::mat column sequence >:(
-	T_ = meanCorr - (R * meanData);
-
-	auto R_new = R_ * R;
-	auto T_new = R_ * T + T_;
-	float SSE = compute_sse_error(R_new, T_new);
-
-	return { SSE, R_new, T_new };
 }
 
 FlattenedKDTree::FlattenedKDTree(const KDTree& kdt, const std::vector<glm::vec3>& pct) {
@@ -514,4 +476,40 @@ BoundsResult_t compute_sse_error(RotNode& rnode, std::vector<TransNode>& tnodes,
 
 	cudaDeviceSynchronize();
 	return { sse_rot_ub_trans_lb, sse_rot_ub_trans_ub };
+}
+
+Result_t computeICP(glm::mat3 R, glm::vec3 T)
+{
+	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+	// Find nearest correspondences
+	kernSearchNearest << <dataBlocksPerGrid, blockSize >> > (numDataPoints, numModelPoints, dev_dataBuffer, dev_modelBuffer, dev_corrBuffer);
+	cudaDeviceSynchronize();
+
+	// Centralize
+	glm::vec3 meanData = thrust::reduce(thrust::device, dev_dataBuffer, dev_dataBuffer + numDataPoints);
+	glm::vec3 meanCorr = thrust::reduce(thrust::device, dev_corrBuffer, dev_corrBuffer + numDataPoints);
+	meanData = meanData / static_cast<float>(numDataPoints);
+	meanCorr = meanCorr / static_cast<float>(numDataPoints);
+
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_centeredDataBuffer, meanData);
+	kernCentralize << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_corrBuffer, dev_centeredCorrBuffer, meanCorr);
+	cudaDeviceSynchronize();
+
+	kernOuterProduct << <dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_centeredDataBuffer, dev_centeredCorrBuffer, dev_ABtBuffer);
+	cudaDeviceSynchronize();
+
+	glm::mat3 ABt = thrust::reduce(dev_ABtBuffer, dev_ABtBuffer + numDataPoints);
+	glm::mat3 R_(0.0f), U(0.0f), S(0.0f), V(0.0f);
+	glm::vec3 T_(0.0f);
+
+	matSVD(ABt, U, S, V);
+
+	R_ = glm::transpose(U) * V; // Strange glm::mat column sequence >:(
+	T_ = meanCorr - (R * meanData);
+
+	auto R_new = R_ * R;
+	auto T_new = R_ * T + T_;
+	float SSE = compute_sse_error(R_new, T_new);
+
+	return { SSE, R_new, T_new };
 }

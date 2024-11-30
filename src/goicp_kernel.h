@@ -9,7 +9,7 @@ namespace ICP {
 	void goicpGPUStep();
 }
 
-float branch_and_bound_SO3();
-ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot);
+float branch_and_bound_SO3(StreamPool& stream_pool);
+ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot, StreamPool& stream_pool);
 
 

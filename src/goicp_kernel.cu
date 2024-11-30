@@ -15,8 +15,6 @@ extern float bestSSE;
 extern glm::mat3 bestR;
 extern glm::vec3 bestT;
 extern float sse_threshold;
-extern StreamPool stream_pool;
-
 
 __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::vec3* out_pos, glm::mat3 R, glm::vec3 T) {
 
@@ -84,7 +82,7 @@ void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT,
 	}
 }
 
-float branch_and_bound_SO3()
+float branch_and_bound_SO3(StreamPool& stream_pool)
 {
     // Initialize Rotation Nodes
     std::priority_queue<RotNode> rcandidates;
@@ -96,8 +94,8 @@ float branch_and_bound_SO3()
     RotNode gt_rnode = RotNode(0.0625f, /*-1.0f / sqrt(2.0f)*/ -0.85f, 0.0625f, 0.0625f, 0.0f, M_INF);
     //RotNode gt_rnode = RotNode(0.0f, -1.0f / sqrt(2.0f), 0.0f, 0.0625f, 0.0f, M_INF);
     Logger() << "Ground Truth Rot:\n" << gt_rnode.q.R;
-    auto [cub, t] = branch_and_bound_R3(gt_rnode, true);
-    auto [clb, _] = branch_and_bound_R3(gt_rnode, false);
+    auto [cub, t] = branch_and_bound_R3(gt_rnode, true, stream_pool);
+    auto [clb, _] = branch_and_bound_R3(gt_rnode, false, stream_pool);
     Logger() << "Correct, ub: " << cub << " lb: " << clb << " t:\n\t" << t;
 
     IterativeClosestPoint3D icp3d(registration, pct, pcs, 1000, sse_threshold, gt_rnode.q.R, t);
@@ -139,7 +137,7 @@ float branch_and_bound_SO3()
             }
 
             // BnB in R3 
-            auto [ub, best_t] = branch_and_bound_R3(child_rnode, true);
+            auto [ub, best_t] = branch_and_bound_R3(child_rnode, true, stream_pool);
 
             if (ub < bestSSE)
             {
@@ -162,7 +160,7 @@ float branch_and_bound_SO3()
                     << "\tTranslation: " << bestT;
             }
 
-            auto [lb, _] = branch_and_bound_R3(child_rnode, false);
+            auto [lb, _] = branch_and_bound_R3(child_rnode, false, stream_pool);
             Logger() << "ub: " << ub
                 << "\tlb: " << lb;
 
@@ -176,7 +174,7 @@ float branch_and_bound_SO3()
     return bestSSE;
 }
 
-ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot)
+ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot, StreamPool& stream_pool)
 {
     float best_error = bestSSE;
     glm::vec3 best_t{ 0.0f };
@@ -249,7 +247,4 @@ ResultBnBR3 branch_and_bound_R3(RotNode& rnode, bool fix_rot)
 
     return { best_error, best_t };
 }
-
-
-
 
