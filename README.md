@@ -114,9 +114,7 @@ global minimum is searched in the $SE(3)$ space (3D Rigid Rotation and Translati
 Instead of directly searching over $SE(3)$, it is proposed to launch an outer-BnB,
 which searches over the $SO(3)$ space (3D Rotation) with BnB algorithm,
 and for each branch, an inner-BnB function, which searches over the $\mathbb{R}^3$ space,
-will be invoked.
-
-The Go-ICP algorithm extends the traditional ICP algorithm by searching for the globally optimal rigid transformation in SE(3) space using a branch-and-bound framework. Below are the detailed steps:
+will be invoked. Below are the detailed steps:
 
 #### 1. Initialization
 - Define two point clouds:
