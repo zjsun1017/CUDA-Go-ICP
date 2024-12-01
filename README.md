@@ -66,12 +66,12 @@ The Iterative Closest Point (ICP) algorithm is a widely used method for aligning
 
 #### 2. Find Closest Points
 For each point $p_i \in P$, find the closest point $q_j \in Q$ using the Euclidean distance:
-$ q_j = \arg\min_{q \in Q} \|p_i - q\|_2 $. Create a set of corresponding pairs $(p_i, q_j)$.
+$q_j = \arg\min_{q \in Q} \|p_i - q\|_2$. Create a set of corresponding pairs $(p_i, q_j)$.
 
 #### 3. Compute Transformation Using Procrustes Method
 
 To compute the optimal transformation $T = (R, t)$ that minimizes the alignment error:
-$ E(R, t) = \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2$.
+$E(R, t) = \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2$.
 
 - **Step 1: Center the Points**
 Compute centroids:
