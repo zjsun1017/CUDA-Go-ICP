@@ -72,7 +72,7 @@ glm::vec3* dev_curDataBuffer;
 
 
 // GOICP on GPU setup
-int maxTNodes = 16;
+int maxTNodes = 128;
 int currTNodes = 0;
 float* dev_errors;
 float* dev_rot_ub_trans_ub;

@@ -31,6 +31,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "jly_goicp.h"
 #include "jly_sorting.hpp"
 
+long long tNodeCount = 0; // Count for translation nodes
+long long rNodeCount = 0; // Count for rotation nodes
+
 GoICP::GoICP()
 {
 	MSEThresh = 1e-3f;
@@ -239,6 +242,7 @@ float GoICP::InnerBnB(float* maxRotDisL, TRANSNODE* nodeTransOut)
 
 		nodeTransParent = queueTrans.top();
 		queueTrans.pop();
+		tNodeCount++;
 
 		curT.val[0][0] = nodeTransParent.x,
 		curT.val[1][0] = nodeTransParent.y,
@@ -397,6 +401,7 @@ float GoICP::OuterBnB()
 		nodeRotParent = queueRot.top();
 		// ...and remove it from the queue
 		queueRot.pop();
+		rNodeCount++;
 
 		// Exit if the optError is less than or equal to the lower bound plus a small epsilon
 		if((optError-nodeRotParent.lb) <= SSEThresh)
@@ -557,6 +562,8 @@ float GoICP::Register()
 	cout << "Optimal Translation Vector:\n";
 	cout << optT << "\n";
 	cout << "************ Go-ICP Finished ************\n";
+	cout << "Total Translation Nodes Searched: " << tNodeCount << "\n";
+	cout << "Total Rotation Nodes Searched: " << rNodeCount << "\n";
 
 	finished = true;
 
