@@ -92,17 +92,15 @@ Ensure $R$ is a proper rotation matrix with $\det(R) = 1$.
 
 - **Step 4: Compute the Translation Vector**
 Compute $t$:
-$t = \bar{q} - R \bar{p}$
+$= \bar{q} - R \bar{p}$.
 
 #### 4. Apply Transformation
 Apply the transformation to the source point cloud:
-$P \leftarrow \{Rp_i + t \, | \, p_i \in P\}$
+$P \leftarrow \{Rp_i + t \, | \, p_i \in P\}$.
 
 #### 5. Evaluate Convergence
 Compute the mean squared alignment error:
-$E = \frac{1}{n} \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2$
-
-Check convergence:
+$E = \frac{1}{n} \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2$. Check convergence:
 - If $E$ is below a threshold $\epsilon$, or the change in $E$ between iterations is small, terminate.
 - Otherwise, repeat steps 2–5.
 
