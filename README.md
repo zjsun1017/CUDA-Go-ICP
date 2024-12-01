@@ -180,6 +180,7 @@ For each region of the transformation space:
 
 **Find Closest Points with k-d Tree**
 - A k-d tree is a binary search tree for organizing points in k-dimensional space, optimized for tasks like nearest neighbor search and range queries. To use it, first build the tree by recursively splitting points along one dimension at a time (e.g., x, y, z) based on median values. For nearest neighbor queries, traverse the tree by comparing the query point with node split dimensions, prune regions that can't contain closer points, and backtrack as needed. This is a very brief introduction. For more information, you can read the [Wikipedia page on k-d trees](https://en.wikipedia.org/wiki/K-d_tree).
+
 ![k-d Tree Visualization](https://upload.wikimedia.org/wikipedia/commons/b/b6/3dtree.png)
 - We integrated the k-d tree from the nanoflann library to accelerate nearest neighbor searches in the point cloud. However, for smaller point clouds, our tests revealed that the k-d tree is not faster than naive iteration.
 
