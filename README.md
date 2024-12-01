@@ -11,7 +11,6 @@
 
 This project implements CUDA acceleration for ICP: the classic point cloud registration algorithm, and its globally optimal improvement, Go-ICP. The project also provides tools for visualization and performance measurement.
 
----
 
 ## Demo
 
@@ -45,8 +44,6 @@ make -j8
 - Point cloud data is stored in the `/data` folder in the root directory. Currently, the project supports two file formats: `.txt` and `.ply`. For the internal format, please refer to the point cloud files we have provided.
 
 
----
-
 ## Algorithm
 
 <!-- Idea to describe the algorithm:
@@ -69,62 +66,62 @@ The Iterative Closest Point (ICP) algorithm is a widely used method for aligning
 
 #### 2. Find Closest Points
 For each point $p_i \in P$, find the closest point $q_j \in Q$ using the Euclidean distance:
-$$
+$
 q_j = \arg\min_{q \in Q} \|p_i - q\|_2
-$$
+$
 Create a set of corresponding pairs $(p_i, q_j)$.
 
 #### 3. Compute Transformation Using Procrustes Method
 
 To compute the optimal transformation $T = (R, t)$ that minimizes the alignment error:
-$$
+$
 E(R, t) = \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2
-$$
+$
 
 - **Step 1: Center the Points**
 Compute centroids:
-$$
+$
 \bar{p} = \frac{1}{n} \sum_{i=1}^{n} p_i, \quad \bar{q} = \frac{1}{n} \sum_{i=1}^{n} q_i
-$$
+$
 Center the point clouds:
-$$
+$
 P_c = \{p_i - \bar{p}\}, \quad Q_c = \{q_i - \bar{q}\}
-$$
+$
 
 - **Step 2: Compute the Cross-Covariance Matrix**
 Compute the covariance matrix $H$:
-$$
+$
 H = \sum_{i=1}^{n} P_c[i] Q_c[i]^\top
-$$
+$
 
 - **Step 3: Perform Singular Value Decomposition (SVD)**
 Decompose $H$ using SVD:
-$$
+$
 H = U \Sigma V^\top
-$$
+$
 Compute the rotation matrix $R$:
-$$
+$
 R = V U^\top
-$$
+$
 Ensure $R$ is a proper rotation matrix with $\det(R) = 1$.
 
 - **Step 4: Compute the Translation Vector**
 Compute $t$:
-$$
+$
 t = \bar{q} - R \bar{p}
-$$
+$
 
 #### 4. Apply Transformation
 Apply the transformation to the source point cloud:
-$$
+$
 P \leftarrow \{Rp_i + t \, | \, p_i \in P\}
-$$
+$
 
 #### 5. Evaluate Convergence
 Compute the mean squared alignment error:
-$$
+$
 E = \frac{1}{n} \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2
-$$
+$
 Check convergence:
 - If $E$ is below a threshold $\epsilon$, or the change in $E$ between iterations is small, terminate.
 - Otherwise, repeat steps 2–5.
