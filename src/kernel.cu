@@ -32,6 +32,11 @@ extern glm::vec3* dev_cubeColBuffer;
 extern glm::vec3* dev_rotCubePosBuffer;
 extern glm::vec3* dev_rotCubeColBuffer;
 
+extern int maxTNodes;
+extern float* dev_errors;
+extern float* dev_rot_ub_trans_ub;
+extern float* dev_rot_ub_trans_lb;
+
 
 // Helper Functions
 void checkCUDAError(const char* msg, int line) {
@@ -108,10 +113,20 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 		checkCUDAErrorWithLine("cudaMallocManaged dev_curDataBuffer failed!");
 	}
 
-	cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
-	cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
-	checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
+	if (mode == GOICP_GPU)
+	{
+		cudaMallocManaged((void**)&dev_errors, sizeof(float) * numDataPoints);
+		checkCUDAErrorWithLine("cudaMallocManaged dev_errors failed!");
+		cudaMallocManaged((void**)&dev_rot_ub_trans_ub, sizeof(float) * numDataPoints * maxTNodes);
+		checkCUDAErrorWithLine("cudaMallocManaged dev_rot_ub_trans_ub failed!");
+		cudaMallocManaged((void**)&dev_rot_ub_trans_lb, sizeof(float) * numDataPoints * maxTNodes);
+		checkCUDAErrorWithLine("cudaMallocManaged dev_rot_ub_trans_lb failed!");
+
+		cudaMallocManaged((void**)&dev_cubePosBuffer, 2 * numCubes * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_cubePosBuffer failed!");
+		cudaMallocManaged((void**)&dev_cubeColBuffer, 2 * numCubes * sizeof(glm::vec3));
+		checkCUDAErrorWithLine("cudaMallocManaged dev_transCubeSizeBuffer failed!");
+	}
 
 	// Set Posistion Buffer
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_dataBuffer);
@@ -132,11 +147,14 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaDeviceSynchronize();
 
 	// Set search buffer
-	std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_cubePosBuffer);
-	std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
-	std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
-	std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
-	cudaDeviceSynchronize();
+	if (mode == GOICP_GPU)
+	{
+		std::copy(transCubePosBuffer.begin(), transCubePosBuffer.end(), dev_cubePosBuffer);
+		std::copy(transCubeColBuffer.begin(), transCubeColBuffer.end(), dev_cubeColBuffer);
+		std::copy(rotCubePosBuffer.begin(), rotCubePosBuffer.end(), dev_cubePosBuffer + numCubes);
+		std::copy(rotCubeColBuffer.begin(), rotCubeColBuffer.end(), dev_cubeColBuffer + numCubes);
+		cudaDeviceSynchronize();
+	}
 }
 
 void PointCloud::copyPointsToVBO(int N, glm::vec3* posBuffer, glm::vec3* colBuffer, float* vbodptr_positions, float* vbodptr_colors) {
@@ -165,6 +183,14 @@ void PointCloud::cleanupBuffers() {
 	{
 		cudaFree(dev_optDataBuffer);
 		cudaFree(dev_curDataBuffer);
+	}
+	if (mode == GOICP_GPU)
+	{
+		cudaFree(dev_errors);
+		cudaFree(dev_rot_ub_trans_ub);
+		cudaFree(dev_rot_ub_trans_lb);
+		cudaFree(dev_cubePosBuffer);
+		cudaFree(dev_cubeColBuffer);
 	}
 	checkCUDAErrorWithLine("cudaFree failed!");
 }

@@ -38,6 +38,7 @@ void initPointCloud(int argc, char** argv)
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
 	numModelPoints = modelBuffer.size();
+	sse_threshold = config.mse_threshold * numDataPoints;
 
 	if (mode == GOICP_CPU)
 	{
@@ -59,6 +60,8 @@ void initPointCloud(int argc, char** argv)
 }
 
 void initSearchSpace() {
+	if (mode != GOICP_GPU) return;
+
 	float initialSize = 1.0f;
 
 	transCubePosBuffer.push_back(glm::vec3(-1.0f, 0.0f, 0.0f));
@@ -148,7 +151,7 @@ void initBufferAndkdTree()
 	Logger(LogLevel::Info) << "Flattened k-d Tree built!";
 }
 
-void runCUDA() {
+void runCUDA(StreamPool& stream_pool) {
 	switch (mode) {
 	case ICP_CPU:
 		ICP::CPUStep(dataBuffer, modelBuffer);
@@ -163,11 +166,23 @@ void runCUDA() {
 		break;
 
 	case GOICP_CPU:
-		ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
+		if (goicp_finished) ICP::naiveGPUStep();
+		else ICP::sgoicpCPUStep(goicp, prev_optR, prev_optT, mtx);
 		break;
 
 	case GOICP_GPU:
-		ICP::naiveGPUStep();
+		if (!initialized) {
+			// Initialize rotation candidates once
+			RotNode rnode = RotNode(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, bestSSE);
+			rcandidates.push(std::move(rnode));
+			initialized = true;
+		}
+
+		// Execute one step of branch and bound
+		if (!ICP::branchAndBoundSO3Step(stream_pool)) {
+			Logger() << "Branch and Bound completed. Final SSE: " << bestSSE;
+			initialized = false; // Reset for next iteration
+		}
 		break;
 
 	default:
@@ -183,11 +198,12 @@ void mainLoop() {
 
 	if (mode == GOICP_CPU)
 	{
+		Logger(LogLevel::Info) << "Initializing Go-ICP on CPU...";
 		std::thread register_thread(&GoICP::Register, &goicp);
 		register_thread.detach();
 	}
-		
 
+	StreamPool stream_pool(32);
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -207,7 +223,7 @@ void mainLoop() {
 		ss << " fps] " << deviceName;
 		glfwSetWindowTitle(window, ss.str().c_str());
 
-		runCUDA();
+		runCUDA(stream_pool);
 		drawMainWindow();
 		drawSecondWindow();
 

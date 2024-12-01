@@ -2747,11 +2747,11 @@ TOML_NAMESPACE_START
 								  typename S  = uint8_t,
 								  typename NS = uint32_t)
 		TOML_NODISCARD_CTOR
-		constexpr time(H h, M m, S s = S{}, NS ns = NS{}) noexcept //
+		constexpr time(H h, M m, S s = S{}, NS numDataPoints = NS{}) noexcept //
 			: hour{ static_cast<uint8_t>(h) },
 			  minute{ static_cast<uint8_t>(m) },
 			  second{ static_cast<uint8_t>(s) },
-			  nanosecond{ static_cast<uint32_t>(ns) }
+			  nanosecond{ static_cast<uint32_t>(numDataPoints) }
 		{}
 
 		TOML_PURE_GETTER
@@ -10627,14 +10627,14 @@ TOML_IMPL_NAMESPACE_START
 		if (val.nanosecond && val.nanosecond <= 999999999u)
 		{
 			stream.put('.');
-			auto ns		  = val.nanosecond;
+			auto numDataPoints		  = val.nanosecond;
 			size_t digits = 9u;
-			while (ns % 10u == 0u)
+			while (numDataPoints % 10u == 0u)
 			{
-				ns /= 10u;
+				numDataPoints /= 10u;
 				digits--;
 			}
-			print_to_stream(stream, ns, {}, digits);
+			print_to_stream(stream, numDataPoints, {}, digits);
 		}
 	}
 

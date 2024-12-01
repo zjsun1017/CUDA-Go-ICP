@@ -69,16 +69,34 @@ Matrix prev_optT = Matrix(3, 1);
 std::mutex mtx;
 glm::vec3* dev_optDataBuffer;
 glm::vec3* dev_curDataBuffer;
+bool goicp_finished = false;
+
+
+// GOICP on GPU setup
+int maxTNodes = 128;
+int currTNodes = 0;
+float* dev_errors;
+float* dev_rot_ub_trans_ub;
+float* dev_rot_ub_trans_lb;
+//StreamPool stream_pool(32);
+
+float bestSSE = FLT_MAX;
+glm::mat3 bestR(0.0f);
+glm::vec3 bestT(0.0f); 
+float sse_threshold = 0;
+
+std::priority_queue<RotNode> rcandidates;
+bool initialized = false;
 
 // Window settings
 std::string deviceName;
 GLFWwindow* window;
 GLFWwindow* secondWindow;
 const char *projectName;
-int main(int argc, char* argv[]);
 
+int main(int argc, char* argv[]);
 void mainLoop();
-void runCUDA();
+void runCUDA(StreamPool& stream_pool);
 void initPointCloud(int argc, char** argv);
 void initSearchSpace();
 void initBufferAndkdTree();
