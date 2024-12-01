@@ -81,7 +81,7 @@ $P_c = \{p_i - \bar{p}\}, \quad Q_c = \{q_i - \bar{q}\}$.
 
 - **Step 2: Compute the Cross-Covariance Matrix**
 Compute the covariance matrix $H$:
-$H = \sum_{i=1}^{n} P_c[i] Q_c[i]^\top$.
+$= \sum_{i=1}^{n} P_c[i] Q_c[i]^\top$.
 
 - **Step 3: Perform Singular Value Decomposition (SVD)**
 Decompose $H$ using SVD:
@@ -101,6 +101,7 @@ $P \leftarrow \{Rp_i + t \, | \, p_i \in P\}$
 #### 5. Evaluate Convergence
 Compute the mean squared alignment error:
 $E = \frac{1}{n} \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2$
+
 Check convergence:
 - If $E$ is below a threshold $\epsilon$, or the change in $E$ between iterations is small, terminate.
 - Otherwise, repeat steps 2–5.
