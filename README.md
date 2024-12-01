@@ -47,7 +47,7 @@ make -j8
 ## Algorithm
 ### Iterative Closest Point (ICP)
 The Iterative Closest Point (ICP) algorithm is a widely used method for aligning two point clouds by iteratively minimizing the distance between corresponding points. It computes the optimal rigid transformation (rotation and translation) to align the source point cloud to the target. A more detailed pipeline is shown below.
-
+![An ICP example](https://pcl.readthedocs.io/projects/tutorials/en/pcl-1.12.0/_images/icp-1.png)
 
 #### 1. Initialization
 - Define two point clouds:
@@ -158,19 +158,45 @@ For each region of the transformation space:
 
 
 ## Acceleration
+
 ### Accelerating ICP
+**Sample point clouds in advance**
+- During the point cloud loading phase, you can choose to sample the point cloud at a specific ratio: `subsample` in the `.toml` configuration file. This significantly improves processing speed. Since the current sampling method is entirely uniform, it generally does not lead to the ICP converging to another position compared to ICP without sampling.
+- **A demo before and after sampling with ratio 0.05**
+<div style="display: flex; justify-content: space-around;">
+  <img src="img/nosample.png" alt="First" width="400" />
+  <img src="img/sample0.05.png" alt="Second" width="400" />
+</div>
 
+**Parallelization of Procrustes Method**
+- For each point in the point cloud, we utilize a CUDA kernel for parallelization. Specifically, this includes: applying mean centering to the point cloud, computing the covariance (i.e., outer product), and applying the $SE(3)$ homogeneous transformation to the point cloud.
+- To accelerate all summation operations, we use thrust::reduce. This specifically includes calculating the mean of the point cloud and obtaining the covariance matrix from the covariance computation.
+- **A demo of our ICP vs our CUDA-accelerated ICP**
 
+<div style="display: flex; justify-content: space-around;">
+  <img src="img/ICP.gif" alt="First GIF" width="400" />
+  <img src="img/ICP_GPU.gif" alt="Second GIF" width="400" />
+</div>
 
-
-
-
-
-
-
-
+**Find Closest Points with k-d Tree**
+- A k-d tree is a binary search tree for organizing points in k-dimensional space, optimized for tasks like nearest neighbor search and range queries. To use it, first build the tree by recursively splitting points along one dimension at a time (e.g., x, y, z) based on median values. For nearest neighbor queries, traverse the tree by comparing the query point with node split dimensions, prune regions that can't contain closer points, and backtrack as needed. This is a very brief introduction. For more information, you can read the [Wikipedia page on k-d trees](https://en.wikipedia.org/wiki/K-d_tree).
+![k-d Tree Visualization](https://upload.wikimedia.org/wikipedia/commons/b/b6/3dtree.png)
+- We integrated the k-d tree from the nanoflann library to accelerate nearest neighbor searches in the point cloud. However, for smaller point clouds, our tests revealed that the k-d tree is not faster than naive iteration.
 
 ### Accelerating Go-ICP
+**Suboptimal faster Go-ICP**
+
+
+
+
+**Flattened k-d Tree on GPU**
+
+
+
+
+**Parallelization of Translation search**
+
+
 
 
 
