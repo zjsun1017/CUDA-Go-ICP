@@ -66,50 +66,33 @@ The Iterative Closest Point (ICP) algorithm is a widely used method for aligning
 
 #### 2. Find Closest Points
 For each point $p_i \in P$, find the closest point $q_j \in Q$ using the Euclidean distance:
-$
-q_j = \arg\min_{q \in Q} \|p_i - q\|_2
-$
-Create a set of corresponding pairs $(p_i, q_j)$.
+$ q_j = \arg\min_{q \in Q} \|p_i - q\|_2 $. Create a set of corresponding pairs $(p_i, q_j)$.
 
 #### 3. Compute Transformation Using Procrustes Method
 
 To compute the optimal transformation $T = (R, t)$ that minimizes the alignment error:
-$
-E(R, t) = \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2
-$
+$ E(R, t) = \sum_{i=1}^{n} \|Rp_i + t - q_i\|_2^2 $.
 
 - **Step 1: Center the Points**
 Compute centroids:
-$
-\bar{p} = \frac{1}{n} \sum_{i=1}^{n} p_i, \quad \bar{q} = \frac{1}{n} \sum_{i=1}^{n} q_i
-$
+$ \bar{p} = \frac{1}{n} \sum_{i=1}^{n} p_i, \quad \bar{q} = \frac{1}{n} \sum_{i=1}^{n} q_i $.
 Center the point clouds:
-$
-P_c = \{p_i - \bar{p}\}, \quad Q_c = \{q_i - \bar{q}\}
-$
+$ P_c = \{p_i - \bar{p}\}, \quad Q_c = \{q_i - \bar{q}\} $.
 
 - **Step 2: Compute the Cross-Covariance Matrix**
 Compute the covariance matrix $H$:
-$
-H = \sum_{i=1}^{n} P_c[i] Q_c[i]^\top
-$
+$ H = \sum_{i=1}^{n} P_c[i] Q_c[i]^\top $.
 
 - **Step 3: Perform Singular Value Decomposition (SVD)**
 Decompose $H$ using SVD:
-$
-H = U \Sigma V^\top
-$
+$ H = U \Sigma V^\top $.
 Compute the rotation matrix $R$:
-$
-R = V U^\top
-$
+$ R = V U^\top $.
 Ensure $R$ is a proper rotation matrix with $\det(R) = 1$.
 
 - **Step 4: Compute the Translation Vector**
 Compute $t$:
-$
-t = \bar{q} - R \bar{p}
-$
+$ t = \bar{q} - R \bar{p} $
 
 #### 4. Apply Transformation
 Apply the transformation to the source point cloud:
