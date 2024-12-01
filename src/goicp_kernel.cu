@@ -16,6 +16,7 @@ extern float bestSSE;
 extern glm::mat3 bestR;
 extern glm::vec3 bestT;
 extern float sse_threshold;
+extern bool goicp_finished;
 
 __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::vec3* out_pos, glm::mat3 R, glm::vec3 T) {
 
@@ -81,6 +82,74 @@ void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT,
 		// clear 
 		numPoints = numDataPoints + numModelPoints;
 	}
+}
+
+void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx) {
+    dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+
+    Matrix curR;
+    Matrix curT;
+
+    bool updated;
+    float currentError = FLT_MAX;
+
+    // Main thread, simply check for update
+    {
+        // Lock mutex before accessing optR and optT
+        std::lock_guard<std::mutex> lock(mtx);
+
+        //finished = goicp.finished;
+        updated = (prev_optR != goicp.optR || prev_optT != goicp.optT);
+        
+        currentError = goicp.optError;
+
+        prev_optR = goicp.optR;
+        prev_optT = goicp.optT;
+
+        curR = goicp.curR;
+        curT = goicp.curT;
+
+    } // Unlock mutex (out of scope)
+
+    if (updated || currentError <= sse_threshold) {
+        // Draw Optimal data cloud
+        glm::mat3 R{ prev_optR.val[0][0], prev_optR.val[0][1] ,prev_optR.val[0][2] ,
+                        prev_optR.val[1][0] ,prev_optR.val[1][1] ,prev_optR.val[1][2] ,
+                        prev_optR.val[2][0] ,prev_optR.val[2][1] ,prev_optR.val[2][2] };
+        R = glm::transpose(R);
+
+        glm::vec3 T{ prev_optT.val[0][0], prev_optT.val[1][0], prev_optT.val[2][0] };
+
+        kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_optDataBuffer, R, T);
+        cudaDeviceSynchronize();
+
+        if (currentError <= sse_threshold)
+        {
+            Logger(LogLevel::Info) <<"Optimal error " << currentError << " smaller than threshold " << sse_threshold <<   ", Terminate Go-ICP, switch back to ICP. ";
+            goicp_finished = true;
+        }
+
+        std::copy(&dev_optDataBuffer[0], &dev_optDataBuffer[0] + numDataPoints, &dev_pos[numModelPoints]);
+    }
+
+    if (!goicp_finished) {
+        // Draw Current computing data cloud
+        glm::mat3 Rc{ curR.val[0][0], curR.val[0][1] ,curR.val[0][2] ,
+                       curR.val[1][0] ,curR.val[1][1] ,curR.val[1][2] ,
+                       curR.val[2][0] ,curR.val[2][1] ,curR.val[2][2] };
+        Rc = glm::transpose(Rc);
+
+        glm::vec3 Tc{ curT.val[0][0], curT.val[1][0], curT.val[2][0] };
+
+        kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_curDataBuffer, Rc, Tc);
+        cudaDeviceSynchronize();
+        std::copy(dev_curDataBuffer, dev_curDataBuffer + numDataPoints, dev_pos + numModelPoints + numDataPoints);
+    }
+    else {
+        // clear 
+        std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_dataBuffer);
+        numPoints = numDataPoints + numModelPoints;
+    }
 }
 
 float branch_and_bound_SO3(StreamPool& stream_pool)

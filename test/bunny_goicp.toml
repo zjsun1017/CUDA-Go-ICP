@@ -16,7 +16,7 @@ visualization = "viz.ply"                   # visualization ply file, set to "" 
 mode = 3                                  # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
 trim = true                                 # perform trimming
 subsample = 0.05                             # subsample the source point cloud
-mse_threshold = 1e-3                        # MSE threshold for convergence
+mse_threshold = 2e-3                        # MSE threshold for convergence
 
 # Search over Rotational Space SO(3)
 [params.rotation]                           # search space in SO(3)

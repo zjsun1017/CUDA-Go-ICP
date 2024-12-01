@@ -69,6 +69,7 @@ Matrix prev_optT = Matrix(3, 1);
 std::mutex mtx;
 glm::vec3* dev_optDataBuffer;
 glm::vec3* dev_curDataBuffer;
+bool goicp_finished = false;
 
 
 // GOICP on GPU setup

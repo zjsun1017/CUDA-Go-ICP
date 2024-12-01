@@ -166,7 +166,8 @@ void runCUDA(StreamPool& stream_pool) {
 		break;
 
 	case GOICP_CPU:
-		ICP::goicpCPUStep(goicp, prev_optR, prev_optT, mtx);
+		if (goicp_finished) ICP::naiveGPUStep();
+		else ICP::sgoicpCPUStep(goicp, prev_optR, prev_optT, mtx);
 		break;
 
 	case GOICP_GPU:
@@ -197,6 +198,7 @@ void mainLoop() {
 
 	if (mode == GOICP_CPU)
 	{
+		Logger(LogLevel::Info) << "Initializing Go-ICP on CPU...";
 		std::thread register_thread(&GoICP::Register, &goicp);
 		register_thread.detach();
 	}

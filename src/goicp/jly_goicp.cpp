@@ -33,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 long long tNodeCount = 0; // Count for translation nodes
 long long rNodeCount = 0; // Count for rotation nodes
+extern bool goicp_finished;
 
 GoICP::GoICP()
 {
@@ -390,6 +391,8 @@ float GoICP::OuterBnB()
 	long long count = 0;
 	while(1)
 	{
+		if (goicp_finished) break;
+
 		if(queueRot.empty())
 		{
 		  cout << "Rotation Queue Empty" << endl;
