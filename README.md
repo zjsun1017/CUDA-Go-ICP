@@ -96,7 +96,7 @@ $= \bar{q} - R \bar{p}$.
 
 #### 4. Apply Transformation
 Apply the transformation to the source point cloud:
-$P \leftarrow \{Rp_i + t \, | \, p_i \in P\}$.
+$P \leftarrow \{Rp_i + t , p_i \in P\}$.
 
 #### 5. Evaluate Convergence
 Compute the mean squared alignment error:
