@@ -55,14 +55,15 @@ file(GLOB headers
     src/*.hpp
     src/goicp/*.h
     src/goicp/*.hpp
-
+    src/fgoicp/*.hpp
 )
 
 file(GLOB sources
     src/*.cpp
     src/*.cu
     src/goicp/*.cpp
-
+    src/fgoicp/*.cpp
+    src/fgoicp/*.cu
 )
 
 list(SORT headers)
@@ -80,7 +81,7 @@ elseif(CMAKE_VERSION VERSION_LESS "3.24.0")
 else()
     set_target_properties(${CMAKE_PROJECT_NAME} PROPERTIES CUDA_ARCHITECTURES native)
 endif()
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "$<$<AND:$<CONFIG:Debug,RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-G>")
+#target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE "$<$<AND:$<CONFIG:Debug,RelWithDebInfo>,$<COMPILE_LANGUAGE:CUDA>>:-G>")
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--extended-lambda>)
 
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${CMAKE_PROJECT_NAME})

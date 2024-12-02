@@ -105,7 +105,7 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	cudaMallocManaged((void**)&dev_minIndices, numModelPoints * sizeof(size_t));
 	checkCUDAErrorWithLine("cudaMallocManaged dev_modelBuffer failed!");
 
-	if (mode == GOICP_CPU)
+	if (mode == GOICP_CPU || mode == GOICP_GPU)
 	{
 		cudaMallocManaged((void**)&dev_optDataBuffer, numDataPoints * sizeof(glm::vec3));
 		checkCUDAErrorWithLine("cudaMallocManaged dev_optDataBuffer failed!");
@@ -133,7 +133,7 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_modelBuffer);
 	std::copy(modelBuffer.begin(), modelBuffer.end(), dev_pos);
 	std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints);
-	if (mode == GOICP_CPU) 
+	if (mode == GOICP_CPU || mode == GOICP_GPU) 
 		std::copy(dataBuffer.begin(), dataBuffer.end(), dev_pos + numModelPoints + numDataPoints);
 
 	// Set color buffer
@@ -142,7 +142,7 @@ void PointCloud::initBuffers(std::vector<glm::vec3>& dataBuffer, std::vector<glm
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
 	kernResetVec3Buffer << < dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints], glm::vec3(1, 0, 0));
 	kernResetVec3Buffer << <modelBlocksPerGrid, blockSize >> > (numModelPoints, dev_col, glm::vec3(0, 0, 1));
-	if (mode == GOICP_CPU) 
+	if (mode == GOICP_CPU || mode == GOICP_GPU)
 		kernResetVec3Buffer <<< dataBlocksPerGrid, blockSize >> > (numDataPoints, &dev_col[numModelPoints + numDataPoints], glm::vec3(1.0));
 	cudaDeviceSynchronize();
 
@@ -179,7 +179,7 @@ void PointCloud::cleanupBuffers() {
 	cudaFree(dev_minIndices);
 	cudaFree(dev_cubePosBuffer);
 	cudaFree(dev_cubeColBuffer);
-	if (mode == GOICP_CPU)
+	if (mode == GOICP_CPU || mode == GOICP_GPU)
 	{
 		cudaFree(dev_optDataBuffer);
 		cudaFree(dev_curDataBuffer);

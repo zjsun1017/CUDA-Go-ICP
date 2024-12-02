@@ -22,7 +22,7 @@ __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::v
 
 	int index = (blockIdx.x * blockDim.x) + threadIdx.x;
 	if (index >= numDataPoints) return;
-
+    
 	out_pos[index] = R * in_pos[index] + T;
 }
 
@@ -151,6 +151,61 @@ void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT
         numPoints = numDataPoints + numModelPoints;
     }
 }
+
+
+
+void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::vec3& prev_optT, std::mutex& mtx) {
+    dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
+
+    glm::mat3 curR;
+    glm::vec3 curT;
+
+    bool updated;
+    float currentError = FLT_MAX;
+
+    // Main thread, simply check for update
+    {
+        // Lock mutex before accessing optR and optT
+        std::lock_guard<std::mutex> lock(mtx);
+
+        //finished = goicp.finished;
+        updated = (prev_optR != fgoicp->optR || prev_optT != fgoicp->optT);
+
+        currentError = fgoicp->get_best_error();
+
+        prev_optR = fgoicp->optR;
+        prev_optT = fgoicp->optT;
+
+        curR = fgoicp->curR;
+        curT = fgoicp->curT;
+
+    } // Unlock mutex (out of scope)
+
+    if (updated || currentError <= sse_threshold) {
+        // Draw Optimal data cloud
+        kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_optDataBuffer, prev_optR, prev_optT);
+        cudaDeviceSynchronize();
+
+        //std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_pos + numModelPoints);
+        cudaMemcpy(dev_pos + numModelPoints, dev_optDataBuffer, sizeof(glm::vec3) * numDataPoints, cudaMemcpyDeviceToDevice);
+    }
+
+    if (true) {
+        // Draw Current computing data cloud
+
+        kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_curDataBuffer, curR, curT);
+        cudaDeviceSynchronize();
+        checkCUDAError("Kern Transform");
+        cudaMemcpy(dev_pos + numModelPoints + numDataPoints, dev_curDataBuffer, sizeof(glm::vec3) * numDataPoints, cudaMemcpyDeviceToDevice);
+        //std::copy(dev_curDataBuffer, dev_curDataBuffer + numDataPoints, dev_pos + numModelPoints + numDataPoints);
+    }
+    else {
+        // clear 
+        std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_dataBuffer);
+        numPoints = numDataPoints + numModelPoints;
+    }
+}
+
 
 float branch_and_bound_SO3(StreamPool& stream_pool)
 {

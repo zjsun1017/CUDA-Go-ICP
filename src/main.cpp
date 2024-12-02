@@ -51,7 +51,9 @@ void initPointCloud(int argc, char** argv)
 		Logger(LogLevel::Info) << "Building Distance Transform...";
 		goicp.BuildDT();
 		Logger(LogLevel::Info) << "Done!";
-
+	}
+	if (mode == GOICP_CPU || mode == GOICP_GPU)
+	{
 		numPoints = 2 * numDataPoints + numModelPoints;
 	}
 	else 
@@ -149,6 +151,13 @@ void initBufferAndkdTree()
 	cudaMalloc((void**)&dev_fkdt, sizeof(FlattenedKDTree));
 	cudaMemcpy(dev_fkdt, &fkdt, sizeof(FlattenedKDTree), cudaMemcpyHostToDevice);
 	Logger(LogLevel::Info) << "Flattened k-d Tree built!";
+
+	// Init fgoicp
+	if (mode == GOICP_GPU)
+	{
+		fgoicp = new icp::FastGoICP(modelBuffer, dataBuffer, 1e-3f, mtx);
+		Logger(LogLevel::Info) << "FastGoICP instance created!";
+	}
 }
 
 void runCUDA(StreamPool& stream_pool) {
@@ -171,18 +180,7 @@ void runCUDA(StreamPool& stream_pool) {
 		break;
 
 	case GOICP_GPU:
-		if (!initialized) {
-			// Initialize rotation candidates once
-			RotNode rnode = RotNode(0.0f, 0.0f, 0.0f, 1.0f, 0.0f, bestSSE);
-			rcandidates.push(std::move(rnode));
-			initialized = true;
-		}
-
-		// Execute one step of branch and bound
-		if (!ICP::branchAndBoundSO3Step(stream_pool)) {
-			Logger() << "Branch and Bound completed. Final SSE: " << bestSSE;
-			initialized = false; // Reset for next iteration
-		}
+		ICP::goicpGPUStep(fgoicp, prev_optR_fgoicp, prev_optT_fgoicp, mtx);
 		break;
 
 	default:
@@ -195,6 +193,12 @@ void mainLoop() {
 	double fps = 0;
 	double timebase = 0;
 	int frame = 0;
+
+	if (mode == GOICP_GPU)
+	{
+		std::thread fgoicp_thread(&icp::FastGoICP::run, fgoicp);
+		fgoicp_thread.detach();
+	}
 
 	if (mode == GOICP_CPU)
 	{
