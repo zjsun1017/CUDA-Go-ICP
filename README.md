@@ -14,8 +14,8 @@ This project implements CUDA acceleration for ICP: the classic point cloud regis
 ## Demo
 Here is a demo that compares the speed of original Go-ICP paper and our method.
 <div style="display: flex; justify-content: space-around;">
-  <img src="img/goicp.gif" alt="First GIF" width="400" />
-  <img src="img/sgoicp.gif" alt="Second GIF" width="400" />
+  <img src="img/sgoicp.gif" alt="First GIF" width="400" />
+  <img src="img/fgoicp.gif" alt="Second GIF" width="400" />
 </div>
 
 ### How to build and run the code
