@@ -31,8 +31,8 @@ void initPointCloud(int argc, char** argv)
 {
 	// Parse configuration
 	Config config(argv[1]);
-	load_cloud(config.io.source, config.subsample, dataBuffer);
-	load_cloud(config.io.target, config.subsample, modelBuffer);
+	load_cloud(config.io.source, config.subsample, 0.01, dataBuffer);
+	load_cloud(config.io.target, config.subsample, 0.01, modelBuffer);
 	mode = config.mode;
 
 	// Initialize drawing state

@@ -92,7 +92,7 @@ void Config::parse_toml(const std::string toml_filepath)
     Logger(LogLevel::Info) << "Config parsed successfully!";
 }
 
-size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, std::vector<glm::vec3>& cloud)
+size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, const float& resize, std::vector<glm::vec3>& cloud)
 {
     size_t num_points = 0;
 
@@ -137,9 +137,9 @@ size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, s
             {
                 if (dis(gen) <= subsample)
                 {
-                    cloud.emplace_back(vertex_buffer[3 * i + 0],
-                        vertex_buffer[3 * i + 1],
-                        vertex_buffer[3 * i + 2]);
+                    cloud.emplace_back(resize * vertex_buffer[3 * i + 0],
+                        resize * vertex_buffer[3 * i + 1],
+                        resize * vertex_buffer[3 * i + 2]);
                     ++index;
                 }
             }
@@ -161,7 +161,7 @@ size_t load_cloud_ply(const std::string& ply_filepath, const float& subsample, s
     return num_points;
 }
 
-size_t load_cloud_txt(const std::string& txt_filepath, const float& subsample, std::vector<glm::vec3>& cloud)
+size_t load_cloud_txt(const std::string& txt_filepath, const float& subsample, const float& resize, std::vector<glm::vec3>& cloud)
 {
     size_t num_points = 0;
 
@@ -199,7 +199,7 @@ size_t load_cloud_txt(const std::string& txt_filepath, const float& subsample, s
 
             if (dis(gen) <= subsample && index < num_points)
             {
-                cloud.emplace_back(x, y, z);
+                cloud.emplace_back(resize * x, resize * y, resize * z);
                 ++index;
             }
         }
@@ -218,7 +218,7 @@ size_t load_cloud_txt(const std::string& txt_filepath, const float& subsample, s
     return num_points;
 }
 
-size_t load_cloud(const std::string& filepath, const float& subsample, std::vector<glm::vec3>& cloud)
+size_t load_cloud(const std::string& filepath, const float& subsample, const float& resize, std::vector<glm::vec3>& cloud)
 {
     auto dot_pos = filepath.find_last_of('.');
     if (dot_pos == std::string::npos)
@@ -231,11 +231,11 @@ size_t load_cloud(const std::string& filepath, const float& subsample, std::vect
 
     if (extension == "ply")
     {
-        return load_cloud_ply(filepath, subsample, cloud);
+        return load_cloud_ply(filepath, subsample, resize, cloud);
     }
     else if (extension == "txt")
     {
-        return load_cloud_txt(filepath, subsample, cloud);
+        return load_cloud_txt(filepath, subsample, resize, cloud);
     }
     else
     {

@@ -59,7 +59,7 @@ GoICP::GoICP()
 	initNodeRot.lb = 0;
 	initNodeTrans.lb = 0;
 
-	doTrim = false;
+	doTrim = true;
 
 	optR = Matrix::eye(3);
 	optT = Matrix(3, 1);
