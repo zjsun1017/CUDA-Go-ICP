@@ -211,7 +211,7 @@ For each region of the transformation space:
 **Flattened k-d Tree on GPU**
 - To improve the speed of the k-d tree, we attempted to flatten the k-d tree structure and store it in the GPU's memory. However, we found that this approach not only failed to enhance performance but actually made subsequent attempts to parallelize Go-ICP even slower (as shown in the speed comparison below)! We suspect this is due to the memory discontinuity introduced by flattening, along with some peculiar issues related to Thrust.
 ![kdperform.png](img%2Fkdperform.png)
-- In conclusion, we ultimately confirmed that k-d trees are not suitable for CUDA and GPU acceleration. Except for the CPU mode of Go-ICP and one mode of ICP on GPU, all remaining k-d tree implementations have been removed and replaced with faster alternatives such as Lookup Tables or straightforward brute-force search.
+- In conclusion, we ultimately confirmed that k-d trees are not suitable for CUDA and GPU acceleration. Except for the CPU mode of Go-ICP and one mode of ICP on GPU, all remaining k-d Tree implementations have been removed and replaced with faster alternatives such as Lookup Tables or straightforward brute-force search.
 
 **Lookup Table (LUT) on GPU**
 
