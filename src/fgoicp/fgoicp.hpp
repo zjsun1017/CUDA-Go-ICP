@@ -23,7 +23,8 @@ namespace icp
             sse_threshold(ns* mse_threshold),    // init *sum* of squared error threshold
             stream_pool(32),
             curR(1.0f), optR(1.0f),
-            curT(0.0f), optT(0.0f)
+            curT(0.0f), optT(0.0f),
+            finished(false)
         {};
 
         ~FastGoICP() {}
@@ -65,6 +66,7 @@ namespace icp
         // For visualization
         glm::mat3 curR, optR;
         glm::vec3 curT, optT;
+        bool finished;
 
     private:
         using ResultBnBR3 = std::tuple<float, glm::vec3>;

@@ -17,6 +17,7 @@ int main(int argc, char* argv[]) {
 	initSearchSpace();
 
 	if (initMainWindow() && initSecondWindow()) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
@@ -181,7 +182,8 @@ void runCUDA(StreamPool& stream_pool) {
 		break;
 
 	case GOICP_GPU:
-		ICP::goicpGPUStep(fgoicp, prev_optR_fgoicp, prev_optT_fgoicp, mtx);
+		if (goicp_finished) ICP::naiveGPUStep();
+		else ICP::goicpGPUStep(fgoicp, prev_optR_fgoicp, prev_optT_fgoicp, mtx);
 		break;
 
 	default:

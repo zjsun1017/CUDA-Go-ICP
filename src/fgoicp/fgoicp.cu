@@ -24,6 +24,7 @@ namespace icp
         Logger(LogLevel::Info) << "Searching over! Best Error: " << best_sse
                                << "\n\tRotation:\n" << best_rotation
                                << "\n\tTranslation: " << best_translation;
+        finished = true;
     }
 
     float FastGoICP::branch_and_bound_SO3()

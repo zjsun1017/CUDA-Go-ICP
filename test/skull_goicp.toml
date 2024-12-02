@@ -7,17 +7,17 @@ version = "0.1"
 description = "Register data point cloud with model point cloud"
 
 [io]
-target = "../data/bunny/model_bunny.txt"    # target (reference) point cloud
-source = "../data/bunny/data_bunny.txt"     # source point cloud
+target = "../data/artec3d/model_skull.ply"    # target (reference) point cloud
+source = "../data/artec3d/data_skull.ply"     # source point cloud
 output = "output.toml"                      # output file: R, t, MSE
 visualization = "viz.ply"                   # visualization ply file, set to "" to skip
 
 [params]
-mode = 3                                  # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
+mode = 4                                  # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
 trim = true                                 # perform trimming
 subsample = 0.05                             # subsample the source point cloud
-mse_threshold = 2e-3                        # MSE threshold for convergence
-resize = 1.0
+mse_threshold = 1e-3                        # MSE threshold for convergence
+resize = 0.01
 
 # Search over Rotational Space SO(3)
 [params.rotation]                           # search space in SO(3)

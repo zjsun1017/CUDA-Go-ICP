@@ -149,10 +149,9 @@ void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT
     else {
         // clear 
         std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_dataBuffer);
-        numPoints = numDataPoints + numModelPoints;
+        numPoints = numDataPoints + numModelPoints - 1;
     }
 }
-
 
 
 void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::vec3& prev_optT, std::mutex& mtx) {
@@ -169,7 +168,7 @@ void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::
         // Lock mutex before accessing optR and optT
         std::lock_guard<std::mutex> lock(mtx);
 
-        //finished = goicp.finished;
+        goicp_finished = fgoicp->finished;
         updated = (prev_optR != fgoicp->optR || prev_optT != fgoicp->optT);
 
         currentError = fgoicp->get_best_error();
@@ -191,7 +190,7 @@ void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::
         cudaMemcpy(dev_pos + numModelPoints, dev_optDataBuffer, sizeof(glm::vec3) * numDataPoints, cudaMemcpyDeviceToDevice);
     }
 
-    if (true) {
+    if (!goicp_finished) {
         // Draw Current computing data cloud
 
         kernTransform << < dataBlocksPerGrid, blockSize >> > (numDataPoints, dev_dataBuffer, dev_curDataBuffer, curR, curT);
@@ -202,8 +201,8 @@ void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::
     }
     else {
         // clear 
-        std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_dataBuffer);
-        numPoints = numDataPoints + numModelPoints;
+        cudaMemcpy(dev_dataBuffer, dev_optDataBuffer, numDataPoints * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
+        numPoints = numDataPoints + numModelPoints - 1;
     }
 }
 
