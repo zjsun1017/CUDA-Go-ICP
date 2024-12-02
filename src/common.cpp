@@ -9,7 +9,7 @@
 
 
 Config::Config(const std::string toml_filepath)
-    : trim(false), subsample(1.0f), mse_threshold(1e-5f),
+    : trim(false), subsample(1.0f), mse_threshold(1e-5f), resize(1.0f),
     io{ "", "", "", "" },
     rotation{ 0, 0, 0, 0, 0, 0 },
     translation{ 0, 0, 0, 0, 0, 0 }
@@ -59,6 +59,7 @@ void Config::parse_toml(const std::string toml_filepath)
         trim = params_section["trim"].value_or(false);
         subsample = params_section["subsample"].value_or(1.0f);
         mse_threshold = params_section["mse_threshold"].value_or(1e-5f);
+        resize = params_section["resize"].value_or(1.0f);
 
         // Check bounding conditions
         subsample = clamp(subsample, 0.0f, 1.0f);

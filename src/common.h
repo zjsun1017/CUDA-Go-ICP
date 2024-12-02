@@ -137,6 +137,7 @@ public:
     bool trim;
     float subsample;
     float mse_threshold;
+    float resize;
 
     struct IO
     {
