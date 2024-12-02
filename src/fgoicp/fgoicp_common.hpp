@@ -216,19 +216,19 @@ namespace icp
             {
                 case LogLevel::Debug:
                     color = "\033[34m"; // Blue
-                    prefix = "[Debug] ";
+                    prefix = "[Debug " + get_current_time() + "] ";
                     break;
                 case LogLevel::Info:
                     color = "\033[32m"; // Green
-                    prefix = "[Info] ";
+                    prefix = "[Info " + get_current_time() + "] ";
                     break;
                 case LogLevel::Warning:
                     color = "\033[33m"; // Yellow
-                    prefix = "[Warning] ";
+                    prefix = "[Warning " + get_current_time() + "] ";
                     break;
                 case LogLevel::Error:
                     color = "\033[31m"; // Red
-                    prefix = "[Error] ";
+                    prefix = "[Error " + get_current_time() + "] ";
                     break;
             }
             // Print the final message with color
@@ -239,6 +239,20 @@ namespace icp
         LogLevel level_;
         std::ostringstream buffer_;
 
+        std::string get_current_time()
+        {
+            auto now = std::chrono::system_clock::now();
+            auto in_time_t = std::chrono::system_clock::to_time_t(now);
+            std::tm buf{};
+#if defined(_WIN32) || defined(_WIN64)
+            localtime_s(&buf, &in_time_t); // Thread-safe on Windows
+#else
+            localtime_r(&in_time_t, &buf); // Thread-safe on Linux
+#endif
+            std::ostringstream ss;
+            ss << std::put_time(&buf, "%H:%M:%S");
+            return ss.str();
+        }
     };
 }
 

@@ -224,11 +224,11 @@ This approach leverages the computational power of GPUs to enhance the speed and
 
 **Parallelization of Translation search**
 
+In our search algorithm, the outer branch-and-bound searches the rotation space, while the inner branch-and-bound searches the translation space. For each given rotation and translation, we need to compute the the summed registration error of all source points, we parallellized the computation of the error, and use a `reduce` kernel to sum the errors up. Furthurmore, to fully utilize the computation resource, we launch several CUDA streams to compute for multiple translations simultaneously.
+
 **Search Heuristics**
 
-
-
-
+The Go-ICP algorithm employs a "greedy" depth-first search (DFS) approach, executing the Iterative Closest Point (ICP) algorithm only on cubes with an upper bound better than the current best error. Although cubes with a worse upper bound are still subdivided and searched, this process can significantly slow down the search. To address this issue, we relaxed the best error threshold, allowing cubes with an upper bound that is worse but close to the best error to also be evaluated instantly using ICP. This adjustment has substantially reduced the time required to find the global optimum.
 
 ## Dependencies
 
