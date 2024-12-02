@@ -348,6 +348,7 @@ void initCubeShaders(GLuint* program) {
 }
 
 bool initSecondWindow() {
+	return true;
 	if (mode != GOICP_GPU) return true;
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -381,6 +382,7 @@ bool initSecondWindow() {
 }
 
 void drawSecondWindow() {
+	return;
 	if (mode != GOICP_GPU) return;
 
 	glfwMakeContextCurrent(secondWindow);

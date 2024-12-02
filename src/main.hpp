@@ -28,6 +28,8 @@
 #include <thread>
 #include <mutex>
 
+#include "fgoicp/fgoicp.hpp"
+
 int mode = 0;
 int numPoints = 0;
 int numDataPoints = 0;
@@ -66,19 +68,20 @@ glm::vec3* dev_cubeColBuffer;
 GoICP goicp;
 Matrix prev_optR = Matrix::eye(3);
 Matrix prev_optT = Matrix(3, 1);
-std::mutex mtx;
-glm::vec3* dev_optDataBuffer;
-glm::vec3* dev_curDataBuffer;
+std::mutex mtx;				   // shared by GOICP GPU
+glm::vec3* dev_optDataBuffer;  // shared by GOICP GPU
+glm::vec3* dev_curDataBuffer;  // shared by GOICP GPU
 bool goicp_finished = false;
 
-
 // GOICP on GPU setup
+icp::FastGoICP* fgoicp;
 int maxTNodes = 128;
 int currTNodes = 0;
 float* dev_errors;
 float* dev_rot_ub_trans_ub;
 float* dev_rot_ub_trans_lb;
-//StreamPool stream_pool(32);
+glm::mat3 prev_optR_fgoicp(1.0f);
+glm::vec3 prev_optT_fgoicp(0.0f);
 
 float bestSSE = FLT_MAX;
 glm::mat3 bestR(0.0f);
