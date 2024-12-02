@@ -3,14 +3,13 @@
 **University of Pennsylvania, CIS 5650: GPU Programming and Architecture, Final Project**
 
 * **Authors**: Mufeng Xu & Zhaojin Sun
-* Tested on: 
-    * Windows 11/Ubuntu 24.04, i9-13900H @ 2.6GHz 32GB, RTX 4080 Laptop 12GB (Personal Computer)
-
+* Tested on:
+  * Windows 11, i9-13900H @ 2.6GHz 32GB, RTX 4080 Laptop 12GB (Personal Computer)
+  * Windows 11, i9- @ ...GHz 64GB, RTX 4090 Laptop 16GB (Personal Computer)
 
 ## Introduction
 
 This project implements CUDA acceleration for ICP: the classic point cloud registration algorithm, and its globally optimal improvement, Go-ICP. The project also provides tools for visualization and performance measurement.
-
 
 ## Demo
 Here is a demo that compares the speed of original Go-ICP paper and our method.
@@ -214,7 +213,14 @@ For each region of the transformation space:
 ![kdperform.png](img%2Fkdperform.png)
 - In conclusion, we ultimately confirmed that k-d trees are not suitable for CUDA and GPU acceleration. Except for the CPU mode of Go-ICP and one mode of ICP on GPU, all remaining k-d tree implementations have been removed and replaced with faster alternatives such as Lookup Tables or straightforward brute-force search.
 
-**Look Up Table on GPU**
+**Lookup Table (LUT) on GPU**
+
+A Lookup Table (LUT) is a data structure that precomputes and stores the results of computationally expensive operations, enabling rapid retrieval during runtime. In our application, we construct a 3D LUT to store squared distances to the nearest point in the target point cloud.
+
+* Efficient Storage: The LUT is stored as a CUDA Texture Object, which allows for efficient lookups due to optimized memory access patterns.
+* Parallel Construction: The LUT is built in parallel on the GPU, offering significantly faster performance compared to CPU-based construction, even with higher resolution.
+
+This approach leverages the computational power of GPUs to enhance the speed and efficiency of nearest neighbor searches in 3D point clouds.
 
 **Parallelization of Translation search**
 
@@ -226,10 +232,13 @@ For each region of the transformation space:
 
 ## Dependencies
 
-- OpenGL Mathematics (GLM) 
-- [TOML++](https://github.com/marzer/tomlplusplus)
-- [tinyply](https://github.com/ddiakopoulos/tinyply)
-- [nanoflann](https://github.com/jlblancoc/nanoflann)
+* [OpenGL Mathematics (GLM)](https://glm.g-truc.net/0.9.4/api/index.html)
+* [Eigen 3](https://eigen.tuxfamily.org/index.php?title=Main_Page)
+* [TOML++](https://github.com/marzer/tomlplusplus)
+* [tinyply](https://github.com/ddiakopoulos/tinyply)
+* [nanoflann](https://github.com/jlblancoc/nanoflann)
+  
+We've included `TOML++`, `tinyply`, and `nanoflann` in our repo. You can install `glm` and `Eigen` via `vcpkg` on Windows.
 
 ## Reference
 
