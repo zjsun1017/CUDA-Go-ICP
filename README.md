@@ -13,8 +13,11 @@ This project implements CUDA acceleration for ICP: the classic point cloud regis
 
 
 ## Demo
-
-
+Here is a demo that compares the speed of original Go-ICP paper and our method.
+<div style="display: flex; justify-content: space-around;">
+  <img src="img/goicp.gif" alt="First GIF" width="400" />
+  <img src="img/sgoicp.gif" alt="Second GIF" width="400" />
+</div>
 
 
 
@@ -41,13 +44,12 @@ make -j8
 **Step 3: Run the demo**
 - The configuration `.toml` files are located in the `/test` folder in the root directory. Pass the file path as an argument to specify the configuration target. For example:
 ```./bin/cis5650_fgo_icp ../test/bunny.toml``` If you are using Visual Studio, make sure the corresponding path is added to the **Command Arguments** in the project configuration.
-- Point cloud data is stored in the `/data` folder in the root directory. Currently, the project supports two file formats: `.txt` and `.ply`. For the internal format, please refer to the point cloud files we have provided.
+- Point cloud data is stored in the `/data` folder in the root directory. Currently, the project supports two file formats: `.txt` and `.ply`. For the internal format, please refer to the point cloud files we have provided. Here is an [online viewer for `.ply` files](https://imagetostl.com/view-ply-online).
 
 
 ## Algorithm
 ### Iterative Closest Point (ICP)
 The Iterative Closest Point (ICP) algorithm is a widely used method for aligning two point clouds by iteratively minimizing the distance between corresponding points. It computes the optimal rigid transformation (rotation and translation) to align the source point cloud to the target. A more detailed pipeline is shown below.
-![An ICP example](https://pcl.readthedocs.io/projects/tutorials/en/pcl-1.12.0/_images/icp-1.png)
 
 #### 1. Initialization
 - Define two point clouds:
@@ -156,6 +158,20 @@ For each region of the transformation space:
 - Return the globally optimal transformation $T = (R, t)$ and the aligned point cloud $P$.
 - The alignment error $E_{opt} = E_{ub}$ is guaranteed to be the global minimum.
 
+### Comparison between ICP and Go-ICP
+- Convergence
+  - ICP converges to a local minimum, highly dependent on initial alignment and prone to suboptimal results if the initial guess is poor.
+  - Go-ICP guarantees global convergence through a branch-and-bound framework, ensuring the optimal solution regardless of initial alignment.
+  - **An example of ICP converging to local minima**
+![localminima.gif](img%2Flocalminima.gif)
+
+- Performance:
+  - ICP is faster for well-aligned point clouds due to its simplicity and focus on local optimization.
+  - Go-ICP is slower because it exhaustively searches both rotation and translation spaces but ensures the best possible result.
+- Robustness:
+  - ICP is sensitive to noise and outliers, which can lead to poor results in challenging scenarios.
+  - Go-ICP is more robust, leveraging distance transforms and global optimization to handle noise and outliers effectively.
+
 
 ## Acceleration
 
@@ -185,9 +201,14 @@ For each region of the transformation space:
 - We integrated the k-d tree from the nanoflann library to accelerate nearest neighbor searches in the point cloud. However, for smaller point clouds, our tests revealed that the k-d tree is not faster than naive iteration.
 
 ### Accelerating Go-ICP
-**Suboptimal faster Go-ICP**
+**Terminate Early**
+- In the original paper, the termination condition for the search is that the lower bounds of all remaining search spaces exceed the current best error. However, in practice, we observed that the point cloud often converges to the correct alignment much earlier, but a significant amount of time is still wasted exploring potentially better parameters. To address this, we introduced an error threshold to terminate the search early.
+- **Performance gain by terminating early**
 
-
+<div style="display: flex; justify-content: space-around;">
+  <img src="img/goicp.gif" alt="First GIF" width="400" />
+  <img src="img/sgoicp.gif" alt="Second GIF" width="400" />
+</div>
 
 
 **Flattened k-d Tree on GPU**
@@ -195,7 +216,13 @@ For each region of the transformation space:
 
 
 
+
+
+**Look Up Table on GPU**
+
 **Parallelization of Translation search**
+
+**Search Heuristics**
 
 
 
