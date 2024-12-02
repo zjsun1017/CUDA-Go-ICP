@@ -34,6 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 long long tNodeCount = 0; // Count for translation nodes
 long long rNodeCount = 0; // Count for rotation nodes
 extern bool goicp_finished;
+extern float mse_threshold;
+extern float sse_threshold;
 
 GoICP::GoICP()
 {
@@ -200,7 +202,8 @@ void GoICP::Initialize()
 	{
 		inlierNum = Nd;
 	}
-	SSEThresh = MSEThresh * inlierNum;
+	/*SSEThresh = MSEThresh * inlierNum;*/
+	SSEThresh = mse_threshold * inlierNum;
 }
 
 void GoICP::Clear()

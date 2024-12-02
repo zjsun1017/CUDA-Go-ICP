@@ -34,7 +34,7 @@ double lastX;
 double lastY;
 float theta = 0.4f;
 float phi = 0.0f;
-float zoom = 5.0f;
+float zoom = 0.5f;
 glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 cameraPosition;
 glm::mat4 projection;

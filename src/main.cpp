@@ -17,7 +17,6 @@ int main(int argc, char* argv[]) {
 	initSearchSpace();
 
 	if (initMainWindow() && initSecondWindow()) {
-		std::this_thread::sleep_for(std::chrono::seconds(10));
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
@@ -39,6 +38,7 @@ void initPointCloud(int argc, char** argv)
 	// Initialize drawing state
 	numDataPoints = dataBuffer.size();
 	numModelPoints = modelBuffer.size();
+	mse_threshold = config.mse_threshold;
 	sse_threshold = config.mse_threshold * numDataPoints;
 
 	if (mode == GOICP_CPU)

@@ -44,7 +44,8 @@ make -j8
 **Step 3: Run the demo**
 - The configuration `.toml` files are located in the `/test` folder in the root directory. Pass the file path as an argument to specify the configuration target. For example:
 ```./bin/cis5650_fgo_icp ../test/bunny.toml``` If you are using Visual Studio, make sure the corresponding path is added to the **Command Arguments** in the project configuration.
-- Point cloud data is stored in the `/data` folder in the root directory. Currently, the project supports two file formats: `.txt` and `.ply`. For the internal format, please refer to the point cloud files we have provided. Here is an [online viewer for `.ply` files](https://imagetostl.com/view-ply-online).
+- Point cloud data (source: [The Stanford 3D Scanning Repository
+](https://graphics.stanford.edu/data/3Dscanrep/)) is stored in the `/data` folder in the root directory. Currently, the project supports two file formats: `.txt` and `.ply`. For the internal format, please refer to the point cloud files we have provided. Here is an [online viewer for `.ply` files](https://imagetostl.com/view-ply-online). 
 
 
 ## Algorithm
@@ -163,14 +164,17 @@ For each region of the transformation space:
   - ICP converges to a local minimum, highly dependent on initial alignment and prone to suboptimal results if the initial guess is poor.
   - Go-ICP guarantees global convergence through a branch-and-bound framework, ensuring the optimal solution regardless of initial alignment.
   - **An example of ICP converging to local minima**
-![localminima.gif](img%2Flocalminima.gif)
+
+<div style="display: flex; justify-content: space-around;">
+  <img src="img/localminima.gif" alt="First GIF" width="400" />
+</div>
+
 
 - Performance:
   - ICP is faster for well-aligned point clouds due to its simplicity and focus on local optimization.
   - Go-ICP is slower because it exhaustively searches both rotation and translation spaces but ensures the best possible result.
 - Robustness:
-  - ICP is sensitive to noise and outliers, which can lead to poor results in challenging scenarios.
-  - Go-ICP is more robust, leveraging distance transforms and global optimization to handle noise and outliers effectively.
+  - Both ICP and Go-ICP are sensitive to noise and outliers, which can lead to poor results in challenging scenarios.
 
 
 ## Acceleration
@@ -210,13 +214,9 @@ For each region of the transformation space:
   <img src="img/sgoicp.gif" alt="Second GIF" width="400" />
 </div>
 
-
 **Flattened k-d Tree on GPU**
-
-
-
-
-
+- To improve the speed of the k-d tree, we attempted to flatten the k-d tree structure and store it in the GPU's memory. However, we found that this approach not only failed to enhance performance but actually made subsequent attempts to parallelize Go-ICP even slower (as shown in the speed comparison later)! We suspect this is due to the memory discontinuity introduced by flattening, along with some peculiar issues related to Thrust.
+- In conclusion, we ultimately confirmed that k-d trees are not suitable for CUDA and GPU acceleration. Except for the CPU mode of Go-ICP and one mode of ICP on GPU, all remaining k-d tree implementations have been removed and replaced with faster alternatives such as Lookup Tables or straightforward brute-force search.
 
 **Look Up Table on GPU**
 

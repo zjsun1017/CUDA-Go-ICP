@@ -101,6 +101,7 @@ void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT
         //finished = goicp.finished;
         updated = (prev_optR != goicp.optR || prev_optT != goicp.optT);
         
+        goicp_finished = goicp.finished;
         currentError = goicp.optError;
 
         prev_optR = goicp.optR;

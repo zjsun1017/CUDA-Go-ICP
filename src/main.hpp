@@ -84,6 +84,7 @@ float bestSSE = FLT_MAX;
 glm::mat3 bestR(0.0f);
 glm::vec3 bestT(0.0f); 
 float sse_threshold = 0;
+float mse_threshold = 0;
 
 std::priority_queue<RotNode> rcandidates;
 bool initialized = false;
