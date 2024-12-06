@@ -14,10 +14,9 @@
 int main(int argc, char* argv[]) {
 	projectName = "Fast Globally Optimal ICP";
 	initPointCloud(argc, argv);
-	initSearchSpace();
 
-	if (initMainWindow() && initSecondWindow()) {
-		std::this_thread::sleep_for(std::chrono::seconds(10));
+	if (initMainWindow()) {
+		//std::this_thread::sleep_for(std::chrono::seconds(10));
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
@@ -63,80 +62,6 @@ void initPointCloud(int argc, char** argv)
 	Logger(LogLevel::Info) << "Total " << numPoints << " points loaded!";
 }
 
-void initSearchSpace() {
-	if (mode != GOICP_GPU) return;
-
-	float initialSize = 1.0f;
-
-	transCubePosBuffer.push_back(glm::vec3(-1.0f, 0.0f, 0.0f));
-	transCubeColBuffer.push_back(glm::vec3(1.0f));
-
-	rotCubePosBuffer.push_back(glm::vec3(1.0f, 0.0f, 0.0f));
-	rotCubeColBuffer.push_back(glm::vec3(1.0f));
-
-	const glm::vec3 offsets[8] = {
-		glm::vec3(-0.5f, -0.5f, -0.5f),
-		glm::vec3(0.5f, -0.5f, -0.5f),
-		glm::vec3(-0.5f,  0.5f, -0.5f),
-		glm::vec3(0.5f,  0.5f, -0.5f),
-		glm::vec3(-0.5f, -0.5f,  0.5f),
-		glm::vec3(0.5f, -0.5f,  0.5f),
-		glm::vec3(-0.5f,  0.5f,  0.5f),
-		glm::vec3(0.5f,  0.5f,  0.5f)
-	};
-
-	int parentStartIndex = 0;
-	int parentCount = 1;
-
-	for (int divideLevel = 1; divideLevel <= maxCubeDivide; ++divideLevel) {
-		float currentSize = initialSize / pow(2, divideLevel);
-
-		for (int parentIndex = parentStartIndex; parentIndex < parentStartIndex + parentCount; ++parentIndex) {
-			glm::vec3 parentPositionTrans = transCubePosBuffer[parentIndex];
-
-			for (int childIndex = 0; childIndex < 8; ++childIndex) {
-				glm::vec3 childPositionTrans = parentPositionTrans + currentSize * offsets[childIndex];
-
-				transCubePosBuffer.push_back(childPositionTrans);
-				transCubeColBuffer.push_back(glm::vec3(1.0f));
-			}
-		}
-
-		for (int parentIndex = parentStartIndex; parentIndex < parentStartIndex + parentCount; ++parentIndex) {
-			glm::vec3 parentPositionRot = rotCubePosBuffer[parentIndex];
-
-			for (int childIndex = 0; childIndex < 8; ++childIndex) {
-				glm::vec3 childPositionRot = parentPositionRot + currentSize * offsets[childIndex];
-
-				rotCubePosBuffer.push_back(childPositionRot);
-
-				float sphereRadius = sqrt(3) / 4;
-				glm::vec3 sphereCenter(1.0f, 0.0f, 0.0f);
-
-				glm::vec3 cubeMin = childPositionRot - glm::vec3(currentSize / 2.0f);
-				glm::vec3 cubeMax = childPositionRot + glm::vec3(currentSize / 2.0f);
-
-				glm::vec3 closestPointOnCube = glm::clamp(sphereCenter, cubeMin, cubeMax);
-
-				float dist = glm::distance(closestPointOnCube, sphereCenter);
-
-				if (dist > sphereRadius) {
-					rotCubeColBuffer.push_back(glm::vec3(0.01f));
-				}
-				else {
-					rotCubeColBuffer.push_back(glm::vec3(1.0f));
-				}
-			}
-		}
-
-		parentStartIndex += parentCount;
-		parentCount *= 8;
-	}
-
-	numCubes = transCubeColBuffer.size();
-	Logger(LogLevel::Info) << "Total " << numCubes << " search cubes initialized!";
-}
-
 void initBufferAndkdTree()
 {
 	// Init k-d Tree on CPU
@@ -162,7 +87,7 @@ void initBufferAndkdTree()
 	}
 }
 
-void runCUDA(StreamPool& stream_pool) {
+void runCUDA() {
 	switch (mode) {
 	case ICP_CPU:
 		ICP::CPUStep(dataBuffer, modelBuffer);
@@ -210,7 +135,6 @@ void mainLoop() {
 		register_thread.detach();
 	}
 
-	StreamPool stream_pool(32);
 	while (!glfwWindowShouldClose(window)) {
 		glfwPollEvents();
 
@@ -230,14 +154,12 @@ void mainLoop() {
 		ss << " fps] " << deviceName;
 		glfwSetWindowTitle(window, ss.str().c_str());
 
-		runCUDA(stream_pool);
+		runCUDA();
 		drawMainWindow();
-		drawSecondWindow();
 
 		glfwPollEvents();
 	}
 	glfwDestroyWindow(window);
-	glfwDestroyWindow(secondWindow);
 	glfwTerminate();
 }
 

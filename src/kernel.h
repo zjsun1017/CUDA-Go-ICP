@@ -1,14 +1,32 @@
 #pragma once
-#include <stdio.h>
-#include <cuda.h>
+// Standard C/C++ Libraries
 #include <cmath>
+#include <cstdlib>
+#include <iostream>
 #include <iomanip>
-#include <glm/glm.hpp>
-#include "utilityCore.hpp"
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <thread>
+#include <mutex>
 
+// OpenGL and GLFW Libraries
+#include <GL/glew.h>
+#include <GLFW/glfw3.h>
+
+// CUDA Libraries
+#include <cuda.h>
+#include <cuda_runtime.h>
+#include <cuda_gl_interop.h>
+
+// GLM Libraries
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+// Thrust Libraries
 #include <thrust/device_vector.h>
 #include <thrust/host_vector.h>
 #include <thrust/scan.h>
@@ -19,6 +37,7 @@
 #include <thrust/remove.h>
 #include <thrust/execution_policy.h>
 
+#include "glslUtility.hpp"
 #include "common.h"
 #include "kdTree.hpp"
 

@@ -1,33 +1,9 @@
 #pragma once
-
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include <iostream>
-#include <cstdlib>
-#include <string>
-#include <sstream>
-#include <fstream>
-#include <cuda_runtime.h>
-#include <cuda_gl_interop.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
-#include "utilityCore.hpp"
 #include "glslUtility.hpp"
+#include "kernel.h"
 #include "icp_kernel.h"
 #include "goicp_kernel.h"
-#include "kernel.h"
-
-#include <math.h>
-#include <cuda.h>
-#include <cuda_runtime.h>
-#include <vector>
-#include <algorithm>
-
 #include "goicp/jly_goicp.h"
-#include <thread>
-#include <mutex>
-
 #include "fgoicp/fgoicp.hpp"
 
 int mode = 0;
@@ -54,16 +30,6 @@ glm::vec3* dev_centeredCorrBuffer;
 glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
-// Search Space Buffers
-int maxCubeDivide = 3;
-int numCubes = 0;
-std::vector<glm::vec3> transCubePosBuffer;
-std::vector<glm::vec3> transCubeColBuffer;
-std::vector<glm::vec3> rotCubePosBuffer;
-std::vector<glm::vec3> rotCubeColBuffer;
-glm::vec3* dev_cubePosBuffer;
-glm::vec3* dev_cubeColBuffer;
-
 // GOICP on CPU setup
 GoICP goicp;
 Matrix prev_optR = Matrix::eye(3);
@@ -75,32 +41,18 @@ bool goicp_finished = false;
 
 // GOICP on GPU setup
 icp::FastGoICP* fgoicp;
-int maxTNodes = 128;
-int currTNodes = 0;
-float* dev_errors;
-float* dev_rot_ub_trans_ub;
-float* dev_rot_ub_trans_lb;
 glm::mat3 prev_optR_fgoicp(1.0f);
 glm::vec3 prev_optT_fgoicp(0.0f);
-
-float bestSSE = FLT_MAX;
-glm::mat3 bestR(0.0f);
-glm::vec3 bestT(0.0f); 
 float sse_threshold = 0;
 float mse_threshold = 0;
-
-std::priority_queue<RotNode> rcandidates;
-bool initialized = false;
 
 // Window settings
 std::string deviceName;
 GLFWwindow* window;
-GLFWwindow* secondWindow;
 const char *projectName;
 
 int main(int argc, char* argv[]);
 void mainLoop();
-void runCUDA(StreamPool& stream_pool);
+void runCUDA();
 void initPointCloud(int argc, char** argv);
-void initSearchSpace();
 void initBufferAndkdTree();

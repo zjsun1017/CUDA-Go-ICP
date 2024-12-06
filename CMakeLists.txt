@@ -49,6 +49,7 @@ endif(UNIX)
 set(GLM_ROOT_DIR "${CMAKE_SOURCE_DIR}/external")
 find_package(GLM REQUIRED)
 include_directories(${GLM_INCLUDE_DIRS})
+include_directories(. ${CMAKE_CURRENT_SOURCE_DIR}/external/include)
 
 file(GLOB headers
     src/*.h
@@ -56,6 +57,8 @@ file(GLOB headers
     src/goicp/*.h
     src/goicp/*.hpp
     src/fgoicp/*.hpp
+    external/*.h
+    external/*.hpp
 )
 
 file(GLOB sources
