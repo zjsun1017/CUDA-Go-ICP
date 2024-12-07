@@ -21,7 +21,7 @@ __global__ void kernTransform(int numDataPoints, const glm::vec3* in_pos, glm::v
 	out_pos[index] = R * in_pos[index] + T;
 }
 
-void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx) {
+void ICP::goicpCPUStep(const GoICP* goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx) {
 	dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
 	Matrix curR;
@@ -34,14 +34,14 @@ void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT,
 		// Lock mutex before accessing optR and optT
 		std::lock_guard<std::mutex> lock(mtx);
 
-		finished = goicp.finished;
-		updated = (prev_optR != goicp.optR || prev_optT != goicp.optT);
+		finished = goicp->finished;
+		updated = (prev_optR != goicp->optR || prev_optT != goicp->optT);
 
-		prev_optR = goicp.optR;
-		prev_optT = goicp.optT;
+		prev_optR = goicp->optR;
+		prev_optT = goicp->optT;
 
-		curR = goicp.curR;
-		curT = goicp.curT;
+		curR = goicp->curR;
+		curT = goicp->curT;
 
 	} // Unlock mutex (out of scope)
 
@@ -79,7 +79,7 @@ void ICP::goicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT,
 	}
 }
 
-void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx) {
+void ICP::sgoicpCPUStep(const GoICP* goicp, Matrix& prev_optR, Matrix& prev_optT, std::mutex& mtx) {
     dim3 dataBlocksPerGrid((numDataPoints + blockSize - 1) / blockSize);
 
     Matrix curR;
@@ -93,17 +93,17 @@ void ICP::sgoicpCPUStep(const GoICP& goicp, Matrix& prev_optR, Matrix& prev_optT
         // Lock mutex before accessing optR and optT
         std::lock_guard<std::mutex> lock(mtx);
 
-        //finished = goicp.finished;
-        updated = (prev_optR != goicp.optR || prev_optT != goicp.optT);
+        //finished = goicp->finished;
+        updated = (prev_optR != goicp->optR || prev_optT != goicp->optT);
         
-        goicp_finished = goicp.finished;
-        currentError = goicp.optError;
+        goicp_finished = goicp->finished;
+        currentError = goicp->optError;
 
-        prev_optR = goicp.optR;
-        prev_optT = goicp.optT;
+        prev_optR = goicp->optR;
+        prev_optT = goicp->optT;
 
-        curR = goicp.curR;
-        curT = goicp.curT;
+        curR = goicp->curR;
+        curT = goicp->curT;
 
     } // Unlock mutex (out of scope)
 
@@ -183,6 +183,8 @@ void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::
 
         //std::copy(dev_optDataBuffer, dev_optDataBuffer + numDataPoints, dev_pos + numModelPoints);
         cudaMemcpy(dev_pos + numModelPoints, dev_optDataBuffer, sizeof(glm::vec3) * numDataPoints, cudaMemcpyDeviceToDevice);
+
+        if (currentError <= sse_threshold) goicp_finished = true;
     }
 
     if (!goicp_finished) {
@@ -199,4 +201,6 @@ void ICP::goicpGPUStep(const icp::FastGoICP* fgoicp, glm::mat3& prev_optR, glm::
         cudaMemcpy(dev_dataBuffer, dev_optDataBuffer, numDataPoints * sizeof(glm::vec3), cudaMemcpyDeviceToDevice);
         numPoints = numDataPoints + numModelPoints - 1;
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }

@@ -43,14 +43,15 @@ void initPointCloud(int argc, char** argv)
 
 	if (mode == GOICP_CPU)
 	{
-		goicp.pModel = modelBuffer.data();
-		goicp.Nm = numModelPoints;
-		goicp.pData = dataBuffer.data();
-		goicp.Nd = numDataPoints;
+		goicp = new GoICP(mse_threshold);
+		goicp->pModel = modelBuffer.data();
+		goicp->Nm = numModelPoints;
+		goicp->pData = dataBuffer.data();
+		goicp->Nd = numDataPoints;
 
 		// Build Distance Transform
 		Logger(LogLevel::Info) << "Building Distance Transform...";
-		goicp.BuildDT();
+		goicp->BuildDT();
 		Logger(LogLevel::Info) << "Done!";
 	}
 	if (mode == GOICP_CPU || mode == GOICP_GPU)
@@ -131,7 +132,7 @@ void mainLoop() {
 	if (mode == GOICP_CPU)
 	{
 		Logger(LogLevel::Info) << "Initializing Go-ICP on CPU...";
-		std::thread register_thread(&GoICP::Register, &goicp);
+		std::thread register_thread(&GoICP::Register, goicp);
 		register_thread.detach();
 	}
 

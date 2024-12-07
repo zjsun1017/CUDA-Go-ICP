@@ -93,7 +93,7 @@ public:
 	ROTNODE optNodeRot;
 	TRANSNODE optNodeTrans;
 
-	GoICP();
+	GoICP(float mse_threshold);
 	~GoICP() {
 		Clear();
 	}

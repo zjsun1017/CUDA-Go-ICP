@@ -41,6 +41,10 @@
 #include "common.h"
 #include "kdTree.hpp"
 
+// GoICP
+#include "goicp/jly_goicp.h"
+#include "fgoicp/fgoicp.hpp"
+
 #define blockSize 512
 #define scene_scale 1.0f
 

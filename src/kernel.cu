@@ -22,6 +22,9 @@ extern FlattenedKDTree* dev_fkdt;
 extern float* dev_minDists;
 extern size_t* dev_minIndices;
 
+extern GoICP* goicp;
+extern icp::FastGoICP* fgoicp;
+
 // Helper Functions
 void checkCUDAError(const char* msg, int line) {
 	cudaError_t err = cudaGetLastError();
@@ -142,5 +145,8 @@ void PointCloud::cleanupBuffers() {
 		cudaFree(dev_curDataBuffer);
 	}
 	checkCUDAErrorWithLine("cudaFree failed!");
+
+	if (fgoicp) delete fgoicp;
+	if (goicp) delete goicp;
 }
 

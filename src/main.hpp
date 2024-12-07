@@ -31,7 +31,7 @@ glm::vec3* dev_centeredDataBuffer;
 glm::mat3* dev_ABtBuffer;
 
 // GOICP on CPU setup
-GoICP goicp;
+GoICP* goicp;
 Matrix prev_optR = Matrix::eye(3);
 Matrix prev_optT = Matrix(3, 1);
 std::mutex mtx;				   // shared by GOICP GPU

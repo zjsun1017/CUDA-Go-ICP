@@ -37,9 +37,9 @@ extern bool goicp_finished;
 extern float mse_threshold;
 extern float sse_threshold;
 
-GoICP::GoICP()
+GoICP::GoICP(float mse_threshold)
 {
-	MSEThresh = 1e-3f;
+	MSEThresh = mse_threshold;
 
 	initNodeRot.a = -PI;
 	initNodeRot.b = -PI;
@@ -350,7 +350,7 @@ float GoICP::OuterBnB()
 	priority_queue<ROTNODE> queueRot;
 
 	// Calculate Initial Error
-	optError = 0;
+	float sse = 0;
 
 	for(i = 0; i < Nd; i++)
 	{
@@ -365,8 +365,9 @@ float GoICP::OuterBnB()
 	}
 	for(i = 0; i < inlierNum; i++)
 	{
-		optError += minDis[i]*minDis[i];
+		sse += minDis[i]*minDis[i];
 	}
+	optError = sse;
 	cout << "Error*: " << optError << " (Init)" << endl;
 
 	Matrix R_icp = optR;
@@ -519,6 +520,11 @@ float GoICP::OuterBnB()
 					optT = t_icp;
 					
 					cout << "Error*: " << error << "(ICP " << (double)(clock() - clockBeginICP)/CLOCKS_PER_SEC << "s)" << endl;
+				}
+
+				if (optError < SSEThresh)
+				{
+					return optError;
 				}
 
 				// Discard all rotation nodes with high lower bounds in the queue
