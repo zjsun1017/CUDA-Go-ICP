@@ -43,7 +43,7 @@ make -j8
 - We have also provided a Python script: `transform_point_cloud.py` for you to generate data point clouds from existing ones.
 
 ## Algorithm
-If you're interested in the details of the ICP and Go-ICP algorithms, you can refer to [this document](Algorithm.md).
+If you're interested in the details of the ICP and Go-ICP algorithms, you can refer to [this document](algorithm.md).
 
 ### Comparison between ICP and Go-ICP
 - Convergence
