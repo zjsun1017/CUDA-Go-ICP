@@ -5,7 +5,6 @@
 * **Authors**: Mufeng Xu & Zhaojin Sun
 * Tested on:
   * Windows 11, i9-13900H @ 2.6GHz 32GB, RTX 4080 Laptop 12GB (Personal Computer)
-  * Windows 11, i9- @ ...GHz 64GB, RTX 4090 Laptop 16GB (Personal Computer)
 
 ## Introduction
 
