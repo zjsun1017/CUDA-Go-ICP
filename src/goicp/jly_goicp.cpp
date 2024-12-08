@@ -61,6 +61,8 @@ GoICP::GoICP(float mse_threshold)
 
 	doTrim = true;
 
+	optError = 1e+10f;
+
 	optR = Matrix::eye(3);
 	optT = Matrix(3, 1);
 	curR = Matrix::eye(3);

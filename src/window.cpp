@@ -28,7 +28,9 @@ bool rightMousePressed = false;
 double lastX;
 double lastY;
 float theta = 0.4f;
-float phi = 0.0f;
+float phi = 0.0f; 
+//float theta = 1.3f;
+//float phi = 3.6f;
 float zoom = 5.0f;
 glm::vec3 lookAt = glm::vec3(0.0f, 0.0f, 0.0f);
 glm::vec3 cameraPosition;
@@ -252,6 +254,8 @@ void updateCamera() {
 	cameraPosition.y = zoom * cos(phi) * sin(theta);
 	cameraPosition += lookAt;
 
+	//std::cout << "Phi: " << phi << "\ttheta: " << theta << "\n";
+
 	projection = glm::perspective(fovy, float(width) / float(height), zNear, zFar);
 	glm::mat4 view = glm::lookAt(cameraPosition, lookAt, glm::vec3(0, 0, 1));
 	projection = projection * view;
@@ -262,4 +266,9 @@ void updateCamera() {
 	if ((location = glGetUniformLocation(program[PROG_POINT], "u_projMatrix")) != -1) {
 		glUniformMatrix4fv(location, 1, GL_FALSE, &projection[0][0]);
 	}
+}
+
+void rotateCamera() {
+	phi += 0.003;
+	updateCamera();
 }

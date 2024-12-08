@@ -10,9 +10,7 @@
 
 Config::Config(const std::string toml_filepath)
     : trim(false), subsample(1.0f), mse_threshold(1e-5f), resize(1.0f),
-    io{ "", "", "", "" },
-    rotation{ 0, 0, 0, 0, 0, 0 },
-    translation{ 0, 0, 0, 0, 0, 0 }
+    io{ "", "", "", "" }
 {
     std::string base_filename = toml_filepath.substr(toml_filepath.find_last_of("/\\") + 1);
     Logger(LogLevel::Info) << "Reading configurations from " << base_filename;
@@ -64,30 +62,6 @@ void Config::parse_toml(const std::string toml_filepath)
         // Check bounding conditions
         subsample = clamp(subsample, 0.0f, 1.0f);
         mse_threshold = clamp(mse_threshold, 1e-10f, INFINITY);
-    }
-
-    // Parse Rotation section
-    if (tbl.contains("params") && tbl["params"].as_table()->contains("rotation"))
-    {
-        auto rotation_section = tbl["params"]["rotation"];
-        rotation.xmin = rotation_section["xmin"].value_or(-1.0f);
-        rotation.xmax = rotation_section["xmax"].value_or(1.0f);
-        rotation.ymin = rotation_section["ymin"].value_or(-1.0f);
-        rotation.ymax = rotation_section["ymax"].value_or(1.0f);
-        rotation.zmin = rotation_section["zmin"].value_or(-1.0f);
-        rotation.zmax = rotation_section["zmax"].value_or(1.0f);
-    }
-
-    // Parse Translation section
-    if (tbl.contains("params") && tbl["params"].as_table()->contains("translation"))
-    {
-        auto translation_section = tbl["params"]["translation"];
-        translation.xmin = translation_section["xmin"].value_or(-1.0f);
-        translation.xmax = translation_section["xmax"].value_or(1.0f);
-        translation.ymin = translation_section["ymin"].value_or(-1.0f);
-        translation.ymax = translation_section["ymax"].value_or(1.0f);
-        translation.zmin = translation_section["zmin"].value_or(-1.0f);
-        translation.zmax = translation_section["zmax"].value_or(1.0f);
     }
 
     Logger(LogLevel::Info) << "Config parsed successfully!";

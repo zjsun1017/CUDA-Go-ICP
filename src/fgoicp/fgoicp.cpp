@@ -8,8 +8,8 @@ namespace icp
 {
     void FastGoICP::run()
     {
-        IterativeClosestPoint3D icp3d(registration, pct, pcs, 100, sse_threshold, glm::mat3(1.0f), glm::vec3(0.0f));
-        auto [icp_sse, icp_R, icp_t] = icp3d.run();
+        IterativeClosestPoint3D icp3d(registration, pct, pcs, 1000, 0.001, glm::mat3(1.0f), glm::vec3(0.0f));
+        auto [icp_sse, icp_R, icp_t] = icp3d.run(curR, curT);
         optR = icp_R;
         optT = icp_t;
         best_sse = icp_sse;
@@ -17,7 +17,12 @@ namespace icp
                                << "\n\tRotation:\n" << icp_R
                                << "\n\tTranslation: " << icp_t;
 
-        branch_and_bound_SO3();
+        Logger(LogLevel::Info) << "SSE Threshold: " << sse_threshold;
+        if (best_sse > sse_threshold)
+        {
+            branch_and_bound_SO3();
+        }
+
         Logger(LogLevel::Info) << "Searching over! Best Error: " << best_sse
                                << "\n\tRotation:\n" << best_rotation
                                << "\n\tTranslation: " << best_translation;
@@ -45,7 +50,7 @@ namespace icp
             float span = rnode.span / 2.0f;
             for (char j = 0; j < 8; ++j)
             {
-                if (span < 0.02f) { continue; }
+                if (span < 0.1f) { continue; }
                 RotNode child_rnode(
                     rnode.q.x - span + (j >> 0 & 1) * rnode.span,
                     rnode.q.y - span + (j >> 1 & 1) * rnode.span,
@@ -67,10 +72,10 @@ namespace icp
                 auto [ub, best_t] = branch_and_bound_R3(child_rnode, true);
                 curT = best_t;
 
-                if (ub < best_sse * 1.8)
+                if (ub < best_sse * 2.f)
                 {
-                    IterativeClosestPoint3D icp3d(registration, pct, pcs, 100, sse_threshold, child_rnode.q.R, best_t);
-                    auto [icp_sse, icp_R, icp_t] = icp3d.run();
+                    IterativeClosestPoint3D icp3d(registration, pct, pcs, 500, 0.001, child_rnode.q.R, best_t);
+                    auto [icp_sse, icp_R, icp_t] = icp3d.run(curR, curT);
 
                     if (icp_sse < best_sse)
                     {
@@ -119,7 +124,7 @@ namespace icp
 
             if (best_error - tcandidates.top().lb < sse_threshold) { break; }
             // Get a batch
-            while (!tcandidates.empty() && tnodes.size() < 16)
+            while (!tcandidates.empty() && tnodes.size() < 1)
             {
                 auto tnode = tcandidates.top();
                 tcandidates.pop();
@@ -152,7 +157,7 @@ namespace icp
 
                 TransNode& tnode = tnodes[i];
                 // Stop if the span is small enough
-                if (tnode.span < 0.1f) { continue; }  // TODO: use config threshold
+                if (tnode.span < 0.12f) { continue; }  // TODO: use config threshold
 
                 float span = tnode.span / 2.0f;
                 // Spawn 8 children

@@ -19,8 +19,8 @@ namespace icp
             registration{pct, nt, pcs, ns},
             max_iter(10), best_sse(M_INF), 
             best_translation(0.0f),
-            mse_threshold(), // init *mean* squared error threshold 
-            sse_threshold(ns* mse_threshold),    // init *sum* of squared error threshold
+            mse_threshold(mse_threshold), // init *mean* squared error threshold 
+            sse_threshold(ns * mse_threshold),    // init *sum* of squared error threshold
             stream_pool(32),
             curR(1.0f), optR(1.0f),
             curT(0.0f), optT(0.0f),

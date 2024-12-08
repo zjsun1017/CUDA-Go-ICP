@@ -10,6 +10,7 @@ bool initMainWindow();
 void initPointVAO();
 void initPointShaders(GLuint* program);
 void updateCamera();
+void rotateCamera();
 void drawMainWindow();
 
 void errorCallback(int error, const char* description);

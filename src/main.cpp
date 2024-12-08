@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 	initPointCloud(argc, argv);
 
 	if (initMainWindow()) {
-		//std::this_thread::sleep_for(std::chrono::seconds(10));
+		std::this_thread::sleep_for(std::chrono::seconds(10));
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
@@ -75,15 +75,18 @@ void initBufferAndkdTree()
 	Logger(LogLevel::Info) << "GPU buffers initialized!";
 
 	// Init k-d Tree on GPU
-	FlattenedKDTree fkdt(kdtree, modelBuffer);
-	cudaMalloc((void**)&dev_fkdt, sizeof(FlattenedKDTree));
-	cudaMemcpy(dev_fkdt, &fkdt, sizeof(FlattenedKDTree), cudaMemcpyHostToDevice);
-	Logger(LogLevel::Info) << "Flattened k-d Tree built!";
+	if (mode == ICP_KDTREE_GPU)
+	{
+		FlattenedKDTree fkdt(kdtree, modelBuffer);
+		cudaMalloc((void**)&dev_fkdt, sizeof(FlattenedKDTree));
+		cudaMemcpy(dev_fkdt, &fkdt, sizeof(FlattenedKDTree), cudaMemcpyHostToDevice);
+		Logger(LogLevel::Info) << "Flattened k-d Tree built!";
+	}
 
 	// Init fgoicp
 	if (mode == GOICP_GPU)
 	{
-		fgoicp = new icp::FastGoICP(modelBuffer, dataBuffer, 1e-3f, mtx);
+		fgoicp = new icp::FastGoICP(modelBuffer, dataBuffer, mse_threshold, mtx);
 		Logger(LogLevel::Info) << "FastGoICP instance created!";
 	}
 }
@@ -108,8 +111,15 @@ void runCUDA() {
 		break;
 
 	case GOICP_GPU:
-		if (goicp_finished) ICP::naiveGPUStep();
-		else ICP::goicpGPUStep(fgoicp, prev_optR_fgoicp, prev_optT_fgoicp, mtx);
+		if (goicp_finished) 
+		{
+			ICP::naiveGPUStep();
+			rotateCamera();
+		}
+		else
+		{
+			ICP::goicpGPUStep(fgoicp, prev_optR_fgoicp, prev_optT_fgoicp, mtx);
+		}
 		break;
 
 	default:
