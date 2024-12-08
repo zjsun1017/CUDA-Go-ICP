@@ -122,13 +122,18 @@ In our search algorithm, the outer branch-and-bound searches the rotation space,
 
 The Go-ICP algorithm employs a "greedy" depth-first search (DFS) approach, executing the Iterative Closest Point (ICP) algorithm only on cubes with an upper bound better than the current best error. Although cubes with a worse upper bound are still subdivided and searched, this process can significantly slow down the search. To address this issue, we relaxed the best error threshold, allowing cubes with an upper bound that is worse but close to the best error to also be evaluated instantly using ICP. This adjustment has substantially reduced the time required to find the global optimum.
 
+**Benchmark**
+
+After the aforementioned accelerations, the speed of our model is almost entirely unaffected by the size of the point cloud. The following figure compares it with Go-ICP on CPU.
+![benchmark.png](img%2Fbenchmark.png)
+
 ## Documents
 
 * [Project Pitch](https://docs.google.com/presentation/d/1C-O1aW140KLWjQmc2-Herpnuvxj0jVhFegk7Wi3SRPE/edit?usp=sharing)
 * [MileStone 1](https://docs.google.com/presentation/d/1omXs0hrGCtUbaen9Aixj6ABXnqk9bh0E/edit?usp=sharing&ouid=103277975545706791648&rtpof=true&sd=true)
 * [MileStone 2](https://docs.google.com/presentation/d/1-inPdKvwNXgdPIlzqkRgooJCiWQup2cT/edit?usp=sharing&ouid=103277975545706791648&rtpof=true&sd=true)
 * [MileStone 3](https://docs.google.com/presentation/d/1oY2VQwpmYA-PWgP9vnW5Jk9unKl88eXV/edit?usp=sharing&ouid=103277975545706791648&rtpof=true&sd=true)
-* [Final Presentation](https://docs.google.com/presentation/d/1oY2VQwpmYA-PWgP9vnW5Jk9unKl88eXV/edit?usp=sharing&ouid=103277975545706791648&rtpof=true&sd=true)
+* [Final Presentation](https://docs.google.com/presentation/d/17i5INuyoSmQThVXmGpy28s4fiXkOSNJo/edit?usp=sharing&ouid=103277975545706791648&rtpof=true&sd=true)
 
 ## Dependencies
 
