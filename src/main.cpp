@@ -16,7 +16,7 @@ int main(int argc, char* argv[]) {
 	Config config = initPointCloud(argc, argv);
 
 	if (initMainWindow()) {
-		std::this_thread::sleep_for(std::chrono::seconds(10));
+		//std::this_thread::sleep_for(std::chrono::seconds(10));
 		initBufferAndkdTree();
 		mainLoop();
 		PointCloud::cleanupBuffers();
