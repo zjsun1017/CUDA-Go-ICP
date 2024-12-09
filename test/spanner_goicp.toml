@@ -1,0 +1,25 @@
+# Example Configurations for Fast Globally Optimal Iterative Closest Point (FGOICP)
+
+[info]
+authors = ["Mufeng Xu"]
+affiliation = "GRASP Lab, University of Pennsylvania"
+version = "0.1"
+description = "Register data point cloud with model point cloud"
+
+[io]
+target = "../data/artec3d/noisy_flipped_model_spanner.ply"    # target (reference) point cloud
+source = "../data/artec3d/model_spanner.ply"     # source point cloud
+output = "output.toml"                      # output file: R, t, MSE
+visualization = "viz.ply"                   # visualization ply file, set to "" to skip
+
+[params]
+mode = 4                                  # 0: ICP on CPU; 1: ICP on GPU; 2: ICP w. kdTree on GPU; 3: Go-ICP on CPU; 4: Go-ICP on GPU
+trim = true                                 # perform trimming
+subsample = 0.1                             # subsample the source point cloud
+mse_threshold = 1.0e-4                        # MSE threshold for convergence
+resize = 0.02
+
+[visualization]
+theta = 2.7
+phi = 1.9
+spin_after_finish = false
