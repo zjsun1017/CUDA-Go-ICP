@@ -9,6 +9,7 @@
 ## Introduction
 
 This project implements CUDA acceleration for ICP: the classic point cloud registration algorithm, and its globally optimal improvement, Go-ICP. The project also provides tools for visualization and performance measurement.
+Our repo for CUDA accelerated Go-ICP is [fast-go-icp](https://github.com/solemnwind/fast-go-icp), the code is also included in this main repo for visualization.
 
 ## Demo
 Here is a demo that compares the speed of original Go-ICP paper and our method.
