@@ -64,6 +64,15 @@ void Config::parse_toml(const std::string toml_filepath)
         mse_threshold = clamp(mse_threshold, 1e-10f, INFINITY);
     }
 
+    // Parse Visualization
+    if (tbl.contains("visualization"))
+    {
+        auto viz_section = tbl["visualization"];
+        viz.theta = viz_section["theta"].value_or(0.0f);
+        viz.phi = viz_section["phi"].value_or(0.4f);
+        viz.spin_after_finish = viz_section["spin_after_finish"].value_or(false);
+    }
+
     Logger(LogLevel::Info) << "Config parsed successfully!";
 }
 

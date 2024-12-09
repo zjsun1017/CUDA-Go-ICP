@@ -13,7 +13,7 @@
 */
 int main(int argc, char* argv[]) {
 	projectName = "Fast Globally Optimal ICP";
-	initPointCloud(argc, argv);
+	Config config = initPointCloud(argc, argv);
 
 	if (initMainWindow()) {
 		std::this_thread::sleep_for(std::chrono::seconds(10));
@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
 	}
 }
 
-void initPointCloud(int argc, char** argv)
+Config initPointCloud(int argc, char** argv)
 {
 	// Parse configuration
 	Config config(argv[1]);
@@ -40,6 +40,9 @@ void initPointCloud(int argc, char** argv)
 	numModelPoints = modelBuffer.size();
 	mse_threshold = config.mse_threshold;
 	sse_threshold = config.mse_threshold * numDataPoints;
+
+	// Initialize camera angles
+	spin_after_finish = config.viz.spin_after_finish;
 
 	if (mode == GOICP_CPU)
 	{
@@ -61,6 +64,8 @@ void initPointCloud(int argc, char** argv)
 	else 
 		numPoints = numDataPoints + numModelPoints;
 	Logger(LogLevel::Info) << "Total " << numPoints << " points loaded!";
+
+	return config;
 }
 
 void initBufferAndkdTree()
@@ -106,15 +111,22 @@ void runCUDA() {
 		break;
 
 	case GOICP_CPU:
-		if (goicp_finished) ICP::naiveGPUStep();
-		else ICP::sgoicpCPUStep(goicp, prev_optR, prev_optT, mtx);
+		if (goicp_finished) 
+		{
+			ICP::naiveGPUStep();
+			if (spin_after_finish) rotateCamera();
+		}
+		else 
+		{
+			ICP::sgoicpCPUStep(goicp, prev_optR, prev_optT, mtx);
+		}
 		break;
 
 	case GOICP_GPU:
 		if (goicp_finished) 
 		{
 			ICP::naiveGPUStep();
-			rotateCamera();
+			if (spin_after_finish) rotateCamera();
 		}
 		else
 		{

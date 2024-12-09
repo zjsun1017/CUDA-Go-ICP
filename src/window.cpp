@@ -272,3 +272,11 @@ void rotateCamera() {
 	phi += 0.003;
 	updateCamera();
 }
+
+void setCameraAngles(float _phi, float _theta)
+{
+	phi = _phi;
+	theta = _theta;
+
+	updateCamera();
+}

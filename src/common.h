@@ -147,6 +147,13 @@ public:
         std::string visualization; // visualization ply path
     } io;
 
+    struct Viz
+    {
+        float phi;
+        float theta;
+        bool spin_after_finish;
+    } viz;
+
     struct Rotation
     {
         float xmin, xmax;

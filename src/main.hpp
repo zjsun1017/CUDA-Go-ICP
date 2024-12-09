@@ -46,6 +46,9 @@ glm::vec3 prev_optT_fgoicp(0.0f);
 float sse_threshold = 0;
 float mse_threshold = 0;
 
+// Visualization Settings
+bool spin_after_finish = false;
+
 // Window settings
 std::string deviceName;
 GLFWwindow* window;
@@ -54,5 +57,5 @@ const char *projectName;
 int main(int argc, char* argv[]);
 void mainLoop();
 void runCUDA();
-void initPointCloud(int argc, char** argv);
+Config initPointCloud(int argc, char** argv);
 void initBufferAndkdTree();

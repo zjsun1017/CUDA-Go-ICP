@@ -11,6 +11,7 @@ void initPointVAO();
 void initPointShaders(GLuint* program);
 void updateCamera();
 void rotateCamera();
+void setCameraAngles(float _phi, float _theta);
 void drawMainWindow();
 
 void errorCallback(int error, const char* description);
